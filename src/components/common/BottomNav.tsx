@@ -1,7 +1,7 @@
 import React from 'react';
-import { Home, Shield, ShoppingBag, Trophy, User } from 'lucide-react';
+import { Home, Shield, ShoppingBag, Trophy, LayoutGrid } from 'lucide-react';
 
-export type TabType = 'home' | 'club' | 'market' | 'leagues' | 'profile';
+export type TabType = 'home' | 'club' | 'market' | 'leagues' | 'more' | 'profile';
 
 interface BottomNavProps {
   activeTab: TabType;
@@ -14,7 +14,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({ activeTab, onTabChange }) 
     { id: 'club' as TabType, label: 'Club', icon: Shield },
     { id: 'market' as TabType, label: 'Mercado', icon: ShoppingBag },
     { id: 'leagues' as TabType, label: 'Ligas', icon: Trophy },
-    { id: 'profile' as TabType, label: 'Perfil', icon: User },
+    { id: 'more' as TabType, label: 'Más', icon: LayoutGrid },
   ];
 
   return (

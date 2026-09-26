@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { AuthProvider, useAuth } from './context/AuthContext.tsx';
+import { AudioProvider } from './context/AudioContext.tsx';
 import { Header } from './components/common/Header.tsx';
 import { BottomNav, TabType } from './components/common/BottomNav.tsx';
 import { OfflineIndicator } from './components/common/OfflineIndicator.tsx';
@@ -8,7 +9,8 @@ import { HomeDashboard } from './components/home/HomeDashboard.tsx';
 import { ClubView } from './components/club/ClubView.tsx';
 import { MarketView } from './components/market/MarketView.tsx';
 import { LeaguesView } from './components/leagues/LeaguesView.tsx';
-import { ProfileView } from './components/profile/ProfileView.tsx';
+import { MoreView } from './components/more/MoreView.tsx';
+import { AdminFullPageView } from './components/labs/AdminFullPageView.tsx';
 import { SettingsModal } from './components/settings/SettingsModal.tsx';
 import { PremiumModal } from './components/premium/PremiumModal.tsx';
 import { LabsAdminModal } from './components/labs/LabsAdminModal.tsx';
@@ -24,6 +26,21 @@ function MainApp() {
   const [isLabsOpen, setIsLabsOpen] = useState(false);
   const [isMatchModalOpen, setIsMatchModalOpen] = useState(false);
   const [isAuthOpen, setIsAuthOpen] = useState(false);
+  const [isAdminStandalone, setIsAdminStandalone] = useState<boolean>(() => {
+    return window.location.pathname === '/directorioraizdenuestraygrandisimaownerv2' ||
+      window.location.hash.includes('directorioraizdenuestraygrandisimaownerv2');
+  });
+
+  useEffect(() => {
+    const handlePopState = () => {
+      if (window.location.pathname === '/directorioraizdenuestraygrandisimaownerv2' ||
+          window.location.hash.includes('directorioraizdenuestraygrandisimaownerv2')) {
+        setIsAdminStandalone(true);
+      }
+    };
+    window.addEventListener('popstate', handlePopState);
+    return () => window.removeEventListener('popstate', handlePopState);
+  }, []);
 
   if (isLoading) {
     return (
@@ -45,6 +62,21 @@ function MainApp() {
       <div className="min-h-screen bg-[#0a0e17] text-slate-100 flex flex-col select-none">
         <ToastContainer />
         <NewUserPage onSuccess={() => refreshUserData()} />
+      </div>
+    );
+  }
+
+  // Standalone Root Admin Console View (/directorioraizdenuestraygrandisimaownerv2)
+  if (isAdminStandalone) {
+    return (
+      <div className="min-h-screen bg-[#080c14] text-slate-100 flex flex-col select-none">
+        <ToastContainer />
+        <AdminFullPageView
+          onBackToApp={() => {
+            setIsAdminStandalone(false);
+            window.history.pushState({}, '', '/');
+          }}
+        />
       </div>
     );
   }
@@ -86,16 +118,21 @@ function MainApp() {
             <LeaguesView onOpenMatchModal={() => setIsMatchModalOpen(true)} />
           )}
 
-          {activeTab === 'profile' && (
-            <ProfileView
+          {(activeTab === 'more' || activeTab === 'profile') && (
+            <MoreView
               onOpenSettings={() => setIsSettingsOpen(true)}
               onOpenPremium={() => setIsPremiumOpen(true)}
+              onOpenLabs={() => setIsLabsOpen(true)}
+              onNavigateToAdminPage={() => {
+                setIsAdminStandalone(true);
+                window.history.pushState({}, '', '/directorioraizdenuestraygrandisimaownerv2');
+              }}
             />
           )}
         </main>
 
         {/* Bottom 5-Tab Navigation Bar */}
-        <BottomNav activeTab={activeTab} onTabChange={setActiveTab} />
+        <BottomNav activeTab={activeTab === 'profile' ? 'more' : activeTab} onTabChange={setActiveTab} />
 
         {/* Interactive Modals */}
         <SettingsModal
@@ -132,7 +169,9 @@ function MainApp() {
 export default function App() {
   return (
     <AuthProvider>
-      <MainApp />
+      <AudioProvider>
+        <MainApp />
+      </AudioProvider>
     </AuthProvider>
   );
 }

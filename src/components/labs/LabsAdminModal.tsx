@@ -189,7 +189,6 @@ export const LabsAdminModal: React.FC<LabsAdminModalProps> = ({ isOpen, onClose 
   };
 
   const handleDeletePlayer = async (id: string) => {
-    if (!confirm('¿Eliminar jugador de la base de datos?')) return;
     try {
       await api.deleteAdminPlayer(id);
       showToast('Jugador eliminado', 'info');
@@ -225,7 +224,6 @@ export const LabsAdminModal: React.FC<LabsAdminModalProps> = ({ isOpen, onClose 
   };
 
   const handleDeleteLeague = async (id: string) => {
-    if (!confirm('¿Eliminar esta liga?')) return;
     try {
       await api.deleteAdminLeague(id);
       showToast('Liga eliminada', 'info');
@@ -261,7 +259,6 @@ export const LabsAdminModal: React.FC<LabsAdminModalProps> = ({ isOpen, onClose 
   };
 
   const handleDeleteTrophy = async (id: string) => {
-    if (!confirm('¿Eliminar trofeo?')) return;
     try {
       await api.deleteAdminTrophy(id);
       showToast('Trofeo eliminado', 'info');
@@ -298,7 +295,6 @@ export const LabsAdminModal: React.FC<LabsAdminModalProps> = ({ isOpen, onClose 
   };
 
   const handleDeleteSponsor = async (id: string) => {
-    if (!confirm('¿Eliminar este patrocinador?')) return;
     try {
       await api.deleteAdminSponsor(id);
       showToast('Patrocinador eliminado', 'info');
@@ -715,12 +711,30 @@ export const LabsAdminModal: React.FC<LabsAdminModalProps> = ({ isOpen, onClose 
                       </div>
                       <span className="text-[10px] text-slate-400">OVR {p.rating} · Pot {p.potential} · {(p.price / 1000000).toFixed(1)}M €</span>
                     </div>
-                    <button
-                      onClick={() => handleDeletePlayer(p.id)}
-                      className="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-950/40"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        onClick={async () => {
+                          try {
+                            await api.adminGeneratePlayerImage(p.id, p.position, p.nationality);
+                            showToast(`¡Rostro hiperrealista IA asignado a ${p.first_name}!`, 'success');
+                            loadData();
+                          } catch (err: any) {
+                            showToast(err.message || 'Error generando con IA', 'error');
+                          }
+                        }}
+                        title="Generar rostro con IA"
+                        className="p-1.5 text-purple-400 hover:text-purple-300 rounded-lg hover:bg-purple-950/40"
+                      >
+                        <Sparkles className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        onClick={() => handleDeletePlayer(p.id)}
+                        className="p-1.5 text-rose-400 hover:text-rose-300 rounded-lg hover:bg-rose-950/40"
+                        title="Eliminar de la base de datos"
+                      >
+                        <Trash2 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
                   </div>
                 ))}
             </div>

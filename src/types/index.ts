@@ -56,13 +56,99 @@ export interface Club {
   goals_for: number;
   goals_against: number;
   trophies_count: number;
+  // Reputation & Fans
+  reputation: number; // Min 1200 needed for sponsors to view/offer
+  fans: number;       // Follower count, max 8,000,000,000
+  // Stadium (0 to 10 - Monumental)
+  stadium_level: number;
+  stadium_name: string;
+  stadium_capacity: number;
+  stadium_upgrading?: boolean;
+  stadium_upgrade_finishes_at?: string | null;
+  // Advanced Kit & Sponsors
   primary_kit_color?: string; // Hex color for jersey main
   secondary_kit_color?: string; // Hex color for stripes/accents
   accent_kit_color?: string; // Hex color for details/borders
-  kit_pattern?: 'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast'; // Pattern
+  sleeve_color?: string;
+  text_kit_color?: string;
+  kit_pattern?: 'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast' | 'camo_geometric' | 'radial_burst';
   collar_type?: 'round' | 'v-neck' | 'polo';
+  number_font?: 'modern' | 'classic' | 'futuristic' | 'stencil';
   active_sponsor_id?: string | null;
+  active_sponsor_ids?: string[]; // Up to 20 when Monumental
   created_at: string;
+}
+
+export interface SponsorOffer {
+  id: string;
+  club_id: string;
+  sponsor_id: string;
+  sponsor_name: string;
+  sponsor_icon: string;
+  category: string;
+  signing_bonus: number;
+  match_bonus: number;
+  required_reputation: number;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+}
+
+export interface ClubPost {
+  id: string;
+  club_id: string;
+  club_name: string;
+  club_crest: string;
+  type: 'match' | 'transfer' | 'statement';
+  title: string;
+  content: string;
+  image_url?: string;
+  likes: number;
+  fans_gained?: number;
+  status_text?: string;
+  is_active_growth?: boolean;
+  created_at: string;
+}
+
+export interface PushAlert {
+  id: string;
+  title: string;
+  body: string;
+  icon?: string;
+  player_id?: string;
+  auction_id?: string;
+  action_label?: string;
+  created_at: string;
+}
+
+export interface LeagueStats {
+  topScorers: Player[];
+  topAssists: Player[];
+  topGoalkeepers: Player[];
+  totalGoals: number;
+  totalMatches: number;
+  avgGoals: string;
+  bestAttack: { club_name: string; goals: number } | null;
+  bestDefense: { club_name: string; goals_conceded: number } | null;
+}
+
+export interface NotificationItem {
+  id: string;
+  user_id: string;
+  club_id?: string;
+  title: string;
+  message: string;
+  type: 'sponsor_offer' | 'match_alert' | 'stadium' | 'social';
+  data?: any;
+  read: boolean;
+  created_at: string;
+}
+
+export interface BackgroundTrack {
+  id: string;
+  title: string;
+  artist: string;
+  url: string;
+  is_active: boolean;
 }
 
 export interface Sponsor {
@@ -246,7 +332,7 @@ export interface CoinTransaction {
   id: string;
   user_id: string;
   amount: number;
-  type: 'reward_code' | 'transfer_buy' | 'transfer_sell' | 'auction_bid' | 'auction_refund' | 'match_bonus' | 'admin_grant';
+  type: 'reward_code' | 'transfer_buy' | 'transfer_sell' | 'auction_bid' | 'auction_refund' | 'match_bonus' | 'admin_grant' | 'sponsor_signing' | 'stadium_upgrade';
   description: string;
   reference_id?: string;
   created_at: string;

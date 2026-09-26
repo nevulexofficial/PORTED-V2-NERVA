@@ -11,7 +11,7 @@ export default defineConfig(() => {
       tailwindcss(),
       VitePWA({
         registerType: 'autoUpdate',
-        includeAssets: ['favicon.ico', 'icon.svg'],
+        includeAssets: ['icon.svg'],
         manifest: {
           id: '/',
           name: 'NERVA - Mobile Football Manager',
@@ -33,7 +33,7 @@ export default defineConfig(() => {
           ],
         },
         devOptions: {
-          enabled: true,
+          enabled: false,
         },
       }),
     ],

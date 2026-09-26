@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import fs from 'fs';
 import { dbManager, db } from './src/server/db.ts';
-import { Club, Player, UserRole, Standing, Match, Sponsor, Trophy } from './src/types/index.ts';
+import { Profile, Club, Player, UserRole, Standing, Match, Sponsor, Trophy } from './src/types/index.ts';
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -92,6 +92,12 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     goals_for: 0,
     goals_against: 0,
     trophies_count: 0,
+    reputation: 950,
+    fans: 5000,
+    stadium_level: 0,
+    stadium_name: 'Cancha Municipal',
+    stadium_capacity: 2500,
+    active_sponsor_ids: [],
     primary_kit_color: '#10b981',
     secondary_kit_color: '#0f172a',
     kit_pattern: 'solid',
@@ -462,16 +468,74 @@ app.get('/api/auctions', (_req: Request, res: Response) => {
           player.club_id = winningUser.club_id;
           player.club_name = db.clubs.find(c => c.id === winningUser.club_id)?.name;
           player.status = 'active';
+
+          // Winner notification
+          db.notifications.unshift({
+            id: `notif-auc-${Date.now()}`,
+            user_id: winningUser.id,
+            club_id: winningUser.club_id,
+            title: `🏆 ¡Fichaje en Subasta Conquistado!`,
+            message: `Al encabezar la subasta de 6 minutos con ${a.current_bid.toLocaleString()} €, ${player.first_name} ${player.last_name} se une a tu plantilla oficial.`,
+            type: 'social',
+            read: false,
+            created_at: new Date().toISOString()
+          });
         }
       }
     }
   });
+
+  // Ensure there is always at least one active 6-minute auction
+  const hasActive = db.auctions.some(a => a.status === 'active');
+  if (!hasActive) {
+    const candidate = db.players.find(p => p.status !== 'auction' && (p.club_id === null || p.status === 'listed')) || db.players[0];
+    if (candidate) {
+      candidate.status = 'auction';
+      const newAuction: Auction = {
+        id: `auc-${Date.now()}`,
+        player_id: candidate.id,
+        player: candidate,
+        starting_bid: Math.max(500000, Math.floor(candidate.price * 0.7)),
+        current_bid: Math.max(500000, Math.floor(candidate.price * 0.7)),
+        highest_bidder_id: null,
+        highest_bidder_club_name: null,
+        starts_at: new Date(now).toISOString(),
+        ends_at: new Date(now + 6 * 60 * 1000).toISOString(), // Exact 6-minute auction limit!
+        status: 'active'
+      };
+      db.auctions.unshift(newAuction);
+    }
+  }
 
   const auctions = db.auctions.map(a => {
     const player = db.players.find(p => p.id === a.player_id);
     return { ...a, player: player || a.player };
   });
   res.json({ auctions });
+});
+
+app.post('/api/auctions/start-for-player', (req: Request, res: Response) => {
+  const { player_id } = req.body;
+  const player = db.players.find(p => p.id === player_id);
+  if (!player) return res.status(404).json({ error: 'Jugador no encontrado' });
+
+  const now = Date.now();
+  player.status = 'auction';
+  const newAuction: Auction = {
+    id: `auc-${Date.now()}`,
+    player_id: player.id,
+    player,
+    starting_bid: Math.max(500000, Math.floor(player.price * 0.7)),
+    current_bid: Math.max(500000, Math.floor(player.price * 0.7)),
+    highest_bidder_id: null,
+    highest_bidder_club_name: null,
+    starts_at: new Date(now).toISOString(),
+    ends_at: new Date(now + 6 * 60 * 1000).toISOString(), // Exact 6-minute auction
+    status: 'active'
+  };
+  db.auctions.unshift(newAuction);
+  dbManager.save();
+  res.json({ success: true, auction: newAuction });
 });
 
 app.post('/api/auctions/bid', (req: Request, res: Response) => {
@@ -562,6 +626,53 @@ app.get('/api/leagues/:id/matches', (req: Request, res: Response) => {
     .filter(m => m.league_id === req.params.id)
     .sort((a, b) => b.matchday - a.matchday);
   res.json({ matches });
+});
+
+app.get('/api/leagues/:id/stats', (req: Request, res: Response) => {
+  const leagueId = req.params.id;
+  const leagueClubs = db.clubs.filter(c => c.league_id === leagueId);
+  const clubIds = new Set(leagueClubs.map(c => c.id));
+  const leaguePlayers = db.players.filter(p => p.club_id && clubIds.has(p.club_id));
+
+  // Top Scorers
+  const topScorers = [...leaguePlayers]
+    .filter(p => (p.goals || 0) > 0)
+    .sort((a, b) => (b.goals || 0) - (a.goals || 0) || b.rating - a.rating)
+    .slice(0, 10);
+
+  // Top Assists
+  const topAssists = [...leaguePlayers]
+    .filter(p => (p.assists || 0) > 0)
+    .sort((a, b) => (b.assists || 0) - (a.assists || 0) || b.rating - a.rating)
+    .slice(0, 10);
+
+  // Top Goalkeepers (POR)
+  const topGoalkeepers = [...leaguePlayers]
+    .filter(p => p.position === 'POR')
+    .sort((a, b) => b.rating - a.rating)
+    .slice(0, 5);
+
+  // Overall Standings calculations
+  const standings = db.standings.filter(s => s.league_id === leagueId);
+  const totalMatches = standings.reduce((acc, s) => acc + (s.played || 0), 0) / 2;
+  const totalGoals = standings.reduce((acc, s) => acc + (s.goals_for || 0), 0);
+  const avgGoals = totalMatches > 0 ? (totalGoals / totalMatches).toFixed(2) : '2.85';
+
+  const bestAttack = [...standings].sort((a, b) => (b.goals_for || 0) - (a.goals_for || 0))[0];
+  const bestDefense = [...standings].sort((a, b) => (a.goals_against || 0) - (b.goals_against || 0))[0];
+
+  res.json({
+    stats: {
+      topScorers,
+      topAssists,
+      topGoalkeepers,
+      totalGoals,
+      totalMatches: Math.max(1, Math.floor(totalMatches)),
+      avgGoals,
+      bestAttack: bestAttack ? { club_name: bestAttack.club_name, goals: bestAttack.goals_for } : null,
+      bestDefense: bestDefense ? { club_name: bestDefense.club_name, goals_conceded: bestDefense.goals_against } : null,
+    }
+  });
 });
 
 // Server-Authoritative Match Simulation
@@ -754,6 +865,58 @@ app.post('/api/matches/simulate', (req: Request, res: Response) => {
     if (firstWinAch && !db.user_achievements.some(ua => ua.user_id === user.id && ua.achievement_id === firstWinAch.id)) {
       db.user_achievements.push({ user_id: user.id, achievement_id: firstWinAch.id, unlocked_at: new Date().toISOString() });
       user.coins += firstWinAch.reward_coins;
+    }
+  }
+
+  // Reputation & Fans adjustment: Won: +10 rep, Draw: +2 rep, Lost: -5 rep
+  if (winnerId === userClub.id) {
+    userClub.reputation = (userClub.reputation || 1000) + 10;
+    userClub.fans = Math.min(8000000000, (userClub.fans || 5000) + 3500);
+  } else if (homeScore === awayScore) {
+    userClub.reputation = (userClub.reputation || 1000) + 2;
+    userClub.fans = Math.min(8000000000, (userClub.fans || 5000) + 800);
+  } else {
+    userClub.reputation = Math.max(0, (userClub.reputation || 1000) - 5);
+  }
+
+  // Sponsor selection trigger: minimum 1200 reputation required
+  if (userClub.reputation >= 1200 && db.sponsors && db.sponsors.length > 0) {
+    const maxSponsorsAllowed = Math.min(20, Math.max(1, (userClub.stadium_level || 0) * 2));
+    const activeCount = userClub.active_sponsor_ids?.length || (userClub.active_sponsor_id ? 1 : 0);
+    const hasPending = db.sponsor_offers.some(o => o.club_id === userClub.id && o.status === 'pending');
+    
+    if (!hasPending && activeCount < maxSponsorsAllowed && Math.random() > 0.2) {
+      const availableSponsors = db.sponsors.filter(s => 
+        !userClub.active_sponsor_ids?.includes(s.id) && userClub.active_sponsor_id !== s.id
+      );
+      if (availableSponsors.length > 0) {
+        const selectedSpn = availableSponsors[Math.floor(Math.random() * availableSponsors.length)];
+        const newOffer = {
+          id: `spn-off-${Date.now()}`,
+          club_id: userClub.id,
+          sponsor_id: selectedSpn.id,
+          sponsor_name: selectedSpn.name,
+          sponsor_icon: selectedSpn.icon_url,
+          category: selectedSpn.category,
+          signing_bonus: selectedSpn.signing_bonus,
+          match_bonus: selectedSpn.match_bonus,
+          required_reputation: 1200,
+          status: 'pending' as const,
+          created_at: new Date().toISOString()
+        };
+        db.sponsor_offers.unshift(newOffer);
+        db.notifications.unshift({
+          id: `notif-${Date.now()}`,
+          user_id: user.id,
+          club_id: userClub.id,
+          title: `¡Oferta de Patrocinio de ${selectedSpn.name}!`,
+          message: `${selectedSpn.name} ha visto tu reputación de ${userClub.reputation} pts y desea patrocinar a tu club. Revisa la oferta en Notificaciones.`,
+          type: 'sponsor_offer',
+          data: newOffer,
+          read: false,
+          created_at: new Date().toISOString()
+        });
+      }
     }
   }
 
@@ -982,6 +1145,557 @@ app.post('/api/matches/schedule-instant', (req: Request, res: Response) => {
   db.matches.unshift(newInstantMatch);
   dbManager.save();
   res.json({ match: newInstantMatch, success: true });
+});
+
+// -------------------------------------------------------------
+// SPONSORS & REPUTATION SYSTEM (Min 1200 Rep to be seen/offered)
+// -------------------------------------------------------------
+app.get('/api/sponsors/offers', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  // If reputation >= 1200 and no pending offers, randomly generate one if not at max capacity
+  const maxSponsorsAllowed = Math.min(20, Math.max(1, (userClub.stadium_level || 0) * 2));
+  const activeCount = userClub.active_sponsor_ids?.length || (userClub.active_sponsor_id ? 1 : 0);
+
+  if ((userClub.reputation || 0) >= 1200 && db.sponsors && db.sponsors.length > 0) {
+    const hasPending = db.sponsor_offers.some(o => o.club_id === userClub.id && o.status === 'pending');
+    if (!hasPending && activeCount < maxSponsorsAllowed) {
+      const available = db.sponsors.filter(s => 
+        !userClub.active_sponsor_ids?.includes(s.id) && userClub.active_sponsor_id !== s.id
+      );
+      if (available.length > 0) {
+        const sel = available[Math.floor(Math.random() * available.length)];
+        const offer = {
+          id: `spn-off-${Date.now()}`,
+          club_id: userClub.id,
+          sponsor_id: sel.id,
+          sponsor_name: sel.name,
+          sponsor_icon: sel.icon_url,
+          category: sel.category,
+          signing_bonus: sel.signing_bonus,
+          match_bonus: sel.match_bonus,
+          required_reputation: 1200,
+          status: 'pending' as const,
+          created_at: new Date().toISOString()
+        };
+        db.sponsor_offers.unshift(offer);
+        dbManager.save();
+      }
+    }
+  }
+
+  const offers = db.sponsor_offers.filter(o => o.club_id === userClub.id);
+  res.json({
+    offers,
+    reputation: userClub.reputation || 0,
+    canBeSeen: (userClub.reputation || 0) >= 1200,
+    activeCount,
+    maxSponsorsAllowed
+  });
+});
+
+app.post('/api/sponsors/offers/:id/accept', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  const offer = db.sponsor_offers.find(o => o.id === req.params.id && o.club_id === userClub.id);
+  if (!offer) return res.status(404).json({ error: 'Oferta no encontrada' });
+  if (offer.status !== 'pending') return res.status(400).json({ error: 'La oferta ya fue procesada' });
+
+  if ((userClub.reputation || 0) < 1200) {
+    return res.status(400).json({ error: 'Se requiere un mínimo de 1200 puntos de reputación para firmar patrocinios.' });
+  }
+
+  const maxSponsorsAllowed = Math.min(20, Math.max(1, (userClub.stadium_level || 0) * 2));
+  if (!userClub.active_sponsor_ids) userClub.active_sponsor_ids = userClub.active_sponsor_id ? [userClub.active_sponsor_id] : [];
+
+  if (userClub.active_sponsor_ids.length >= maxSponsorsAllowed) {
+    return res.status(400).json({ 
+      error: `Capacidad de patrocinadores agotada (${userClub.active_sponsor_ids.length}/${maxSponsorsAllowed}). Mejora tu estadio para desbloquear hasta 20 patrocinadores.` 
+    });
+  }
+
+  offer.status = 'accepted';
+  userClub.active_sponsor_ids.push(offer.sponsor_id);
+  userClub.active_sponsor_id = offer.sponsor_id;
+
+  // Pay signing bonus
+  user.coins += offer.signing_bonus;
+  db.coin_transactions.unshift({
+    id: `tx-${Date.now()}`,
+    user_id: user.id,
+    amount: offer.signing_bonus,
+    type: 'sponsor_signing',
+    description: `Firma comercial oficial de patrocinio con ${offer.sponsor_name}`,
+    created_at: new Date().toISOString()
+  });
+
+  db.notifications.unshift({
+    id: `notif-${Date.now()}`,
+    user_id: user.id,
+    club_id: userClub.id,
+    title: '¡Contrato de Patrocinio Firmado!',
+    message: `Has cerrado exitosamente el patrocinio con ${offer.sponsor_name}. Se han ingresado ${offer.signing_bonus.toLocaleString()} monedas a las arcas del club.`,
+    type: 'sponsor_offer',
+    read: false,
+    created_at: new Date().toISOString()
+  });
+
+  dbManager.save();
+  res.json({ success: true, offer, userCoins: user.coins, club: userClub });
+});
+
+app.post('/api/sponsors/offers/:id/reject', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  const offer = db.sponsor_offers.find(o => o.id === req.params.id && o.club_id === userClub.id);
+  if (!offer) return res.status(404).json({ error: 'Oferta no encontrada' });
+
+  offer.status = 'rejected';
+  dbManager.save();
+  res.json({ success: true, offer });
+});
+
+// -------------------------------------------------------------
+// STADIUM INFRASTRUCTURE (Level 0 to 10 - Monumental)
+// -------------------------------------------------------------
+const STADIUM_LEVELS = [
+  { level: 0, name: 'Cancha Municipal', capacity: 2500, maxSponsors: 1, cost: 0, reqRep: 0, reqFans: 0, buildTimeSeconds: 0 },
+  { level: 1, name: 'Graderío Básico', capacity: 6000, maxSponsors: 2, cost: 250000, reqRep: 500, reqFans: 10000, buildTimeSeconds: 60 },
+  { level: 2, name: 'Estadio Regional', capacity: 14000, maxSponsors: 3, cost: 750000, reqRep: 700, reqFans: 50000, buildTimeSeconds: 180 },
+  { level: 3, name: 'Arena Comunitaria', capacity: 24000, maxSponsors: 4, cost: 1800000, reqRep: 900, reqFans: 150000, buildTimeSeconds: 360 },
+  { level: 4, name: 'Estadio Metropolitano', capacity: 38000, maxSponsors: 5, cost: 4500000, reqRep: 1050, reqFans: 500000, buildTimeSeconds: 720 },
+  { level: 5, name: 'Parque Deportivo Nerva', capacity: 50000, maxSponsors: 7, cost: 8500000, reqRep: 1200, reqFans: 1200000, buildTimeSeconds: 1800 },
+  { level: 6, name: 'Estadio Olímpico', capacity: 65000, maxSponsors: 9, cost: 14000000, reqRep: 1300, reqFans: 3000000, buildTimeSeconds: 3600 },
+  { level: 7, name: 'La Catedral del Fútbol', capacity: 80000, maxSponsors: 12, cost: 22000000, reqRep: 1380, reqFans: 6500000, buildTimeSeconds: 7200 },
+  { level: 8, name: 'Gran Coliseo', capacity: 95000, maxSponsors: 15, cost: 32000000, reqRep: 1430, reqFans: 11000000, buildTimeSeconds: 14400 },
+  { level: 9, name: 'Superdomo Galáctico', capacity: 110000, maxSponsors: 17, cost: 42000000, reqRep: 1470, reqFans: 15000000, buildTimeSeconds: 28800 },
+  { 
+    level: 10, 
+    name: 'MONUMENTAL', 
+    capacity: 135000, 
+    maxSponsors: 20, 
+    cost: 50000000, // 50 Millones
+    reqRep: 1500,     // 1500 Reputacion
+    reqFans: 20000000,// 20 Millones Fans
+    buildTimeSeconds: 14 * 86400 // 2 semanas (1,209,600 segundos)
+  },
+];
+
+app.get('/api/stadium/info', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  const currentLevelNum = userClub.stadium_level || 0;
+  const currentConfig = STADIUM_LEVELS.find(l => l.level === currentLevelNum) || STADIUM_LEVELS[0];
+  const nextConfig = STADIUM_LEVELS.find(l => l.level === currentLevelNum + 1) || null;
+
+  // Check if upgrade finished
+  if (userClub.stadium_upgrading && userClub.stadium_upgrade_finishes_at) {
+    if (Date.now() >= new Date(userClub.stadium_upgrade_finishes_at).getTime()) {
+      userClub.stadium_upgrading = false;
+      userClub.stadium_level = Math.min(10, currentLevelNum + 1);
+      const upgradedConfig = STADIUM_LEVELS.find(l => l.level === userClub.stadium_level) || STADIUM_LEVELS[10];
+      userClub.stadium_name = upgradedConfig.name;
+      userClub.stadium_capacity = upgradedConfig.capacity;
+      dbManager.save();
+    }
+  }
+
+  res.json({
+    club: userClub,
+    currentLevel: currentConfig,
+    nextLevel: nextConfig,
+    allLevels: STADIUM_LEVELS,
+    userCoins: user.coins
+  });
+});
+
+app.post('/api/stadium/upgrade', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  const currentLevelNum = userClub.stadium_level || 0;
+  if (currentLevelNum >= 10) {
+    return res.status(400).json({ error: 'El estadio ya ha alcanzado el nivel máximo: MONUMENTAL' });
+  }
+
+  if (userClub.stadium_upgrading) {
+    return res.status(400).json({ error: 'El estadio ya se encuentra en obras de ampliación' });
+  }
+
+  const nextConfig = STADIUM_LEVELS.find(l => l.level === currentLevelNum + 1);
+  if (!nextConfig) return res.status(400).json({ error: 'Nivel no disponible' });
+
+  // Validate requirements
+  if (user.coins < nextConfig.cost) {
+    return res.status(400).json({ error: `Fondos insuficientes. Se requieren ${nextConfig.cost.toLocaleString()} monedas.` });
+  }
+  if ((userClub.reputation || 0) < nextConfig.reqRep) {
+    return res.status(400).json({ error: `Reputación insuficiente. Se requieren ${nextConfig.reqRep} puntos (tienes ${userClub.reputation || 0}).` });
+  }
+  if ((userClub.fans || 0) < nextConfig.reqFans) {
+    return res.status(400).json({ error: `Seguidores insuficientes. Se requieren ${nextConfig.reqFans.toLocaleString()} fans (tienes ${(userClub.fans || 0).toLocaleString()}).` });
+  }
+
+  // Deduct cost
+  user.coins -= nextConfig.cost;
+  db.coin_transactions.unshift({
+    id: `tx-${Date.now()}`,
+    user_id: user.id,
+    amount: -nextConfig.cost,
+    type: 'stadium_upgrade',
+    description: `Inicio de obras para el estadio ${nextConfig.name} (Nivel ${nextConfig.level})`,
+    created_at: new Date().toISOString()
+  });
+
+  const finishesAt = new Date(Date.now() + nextConfig.buildTimeSeconds * 1000).toISOString();
+  userClub.stadium_upgrading = true;
+  userClub.stadium_upgrade_finishes_at = finishesAt;
+
+  db.notifications.unshift({
+    id: `notif-${Date.now()}`,
+    user_id: user.id,
+    club_id: userClub.id,
+    title: `¡Obras Iniciadas: ${nextConfig.name}!`,
+    message: `Se han puesto en marcha las obras para alcanzar el nivel ${nextConfig.level}. Capacidad final: ${nextConfig.capacity.toLocaleString()} y hasta ${nextConfig.maxSponsors} patrocinadores.`,
+    type: 'stadium',
+    read: false,
+    created_at: new Date().toISOString()
+  });
+
+  dbManager.save();
+  res.json({
+    success: true,
+    finishesAt,
+    club: userClub,
+    userCoins: user.coins
+  });
+});
+
+app.post('/api/stadium/claim-upgrade', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  if (!userClub.stadium_upgrading || !userClub.stadium_upgrade_finishes_at) {
+    return res.status(400).json({ error: 'No hay ninguna obra activa para finalizar' });
+  }
+
+  const remaining = new Date(userClub.stadium_upgrade_finishes_at).getTime() - Date.now();
+  if (remaining > 0) {
+    return res.status(400).json({ 
+      error: `La construcción sigue en curso. Faltan ${Math.ceil(remaining / 1000 / 60)} minutos.` 
+    });
+  }
+
+  userClub.stadium_upgrading = false;
+  userClub.stadium_level = Math.min(10, (userClub.stadium_level || 0) + 1);
+  const conf = STADIUM_LEVELS.find(l => l.level === userClub.stadium_level) || STADIUM_LEVELS[10];
+  userClub.stadium_name = conf.name;
+  userClub.stadium_capacity = conf.capacity;
+
+  dbManager.save();
+  res.json({ success: true, club: userClub });
+});
+
+// -------------------------------------------------------------
+// CLUB SOCIAL MEDIA (NERVA Social / Fans - Max 8 Billones)
+// -------------------------------------------------------------
+app.get('/api/social/posts', (_req: Request, res: Response) => {
+  const now = Date.now();
+  const postsWithDynamicGrowth = (db.club_posts || []).map(post => {
+    const elapsedMs = now - new Date(post.created_at).getTime();
+    const tenMinutesMs = 10 * 60 * 1000;
+    const postClub = db.clubs.find(c => c.id === post.club_id);
+    const rep = postClub?.reputation || 1000;
+
+    if (elapsedMs < tenMinutesMs) {
+      // First 10 minutes: 0 new fans gained
+      const minutesLeft = Math.ceil((tenMinutesMs - elapsedMs) / 60000);
+      return {
+        ...post,
+        fans_gained: 0,
+        is_active_growth: false,
+        status_text: `Primeros minutos (0 nuevos fans) · El impacto de afición aumentará en ${minutesLeft} min según reputación (${rep} pts)`
+      };
+    } else {
+      // 10 minutes and beyond: fans increase progressively based on reputation
+      const minutesOver = Math.floor((elapsedMs - tenMinutesMs) / 60000) + 1;
+      const ratePerMinute = Math.floor((rep / 1000) * 180) + 25;
+      const calculatedFans = Math.min(25000000, minutesOver * ratePerMinute);
+      
+      return {
+        ...post,
+        fans_gained: calculatedFans,
+        is_active_growth: true,
+        status_text: `🔥 Creciendo según reputación (${rep} pts): +${calculatedFans.toLocaleString()} nuevos aficionados acumulados tras ${Math.floor(elapsedMs / 60000)} min`
+      };
+    }
+  });
+
+  res.json({ posts: postsWithDynamicGrowth });
+});
+
+app.post('/api/social/posts', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const userClub = db.clubs.find(c => c.id === user.club_id);
+  if (!userClub) return res.status(400).json({ error: 'Club no encontrado' });
+
+  const { title, content, type, image_url } = req.body;
+  if (!content) return res.status(400).json({ error: 'El contenido de la publicación no puede estar vacío' });
+
+  const newPost = {
+    id: `post-${Date.now()}`,
+    club_id: userClub.id,
+    club_name: userClub.name,
+    club_crest: userClub.crest_url,
+    type: type || 'statement',
+    title: title || 'Comunicado Oficial',
+    content,
+    image_url: image_url || null,
+    likes: 0, // Starts at 0
+    fans_gained: 0, // In the first 10 minutes starts at 0!
+    created_at: new Date().toISOString()
+  };
+
+  db.club_posts.unshift(newPost);
+  dbManager.save();
+  res.json({ post: newPost, fans: userClub.fans });
+});
+
+app.post('/api/social/posts/:id/like', (req: Request, res: Response) => {
+  const post = db.club_posts.find(p => p.id === req.params.id);
+  if (!post) return res.status(404).json({ error: 'Publicación no encontrada' });
+  post.likes = (post.likes || 0) + 1;
+  dbManager.save();
+  res.json({ success: true, likes: post.likes });
+});
+
+// -------------------------------------------------------------
+// NOTIFICATIONS SYSTEM
+// -------------------------------------------------------------
+app.get('/api/notifications', (req: Request, res: Response) => {
+  const user = getSessionUser(req);
+  const notifs = db.notifications.filter(n => n.user_id === user.id || n.club_id === user.club_id);
+  res.json({ notifications: notifs });
+});
+
+app.put('/api/notifications/:id/read', (req: Request, res: Response) => {
+  const notif = db.notifications.find(n => n.id === req.params.id);
+  if (notif) notif.read = true;
+  dbManager.save();
+  res.json({ success: true });
+});
+
+app.delete('/api/notifications/:id', (req: Request, res: Response) => {
+  db.notifications = db.notifications.filter(n => n.id !== req.params.id);
+  dbManager.save();
+  res.json({ success: true });
+});
+
+// -------------------------------------------------------------
+// BACKGROUND AUDIO & MUSIC
+// -------------------------------------------------------------
+app.get('/api/audio/tracks', (_req: Request, res: Response) => {
+  res.json({ tracks: db.background_tracks || [] });
+});
+
+app.post('/api/audio/upload', (req: Request, res: Response) => {
+  const { title, artist, url, dataUrl } = req.body;
+  let trackUrl = url;
+
+  if (dataUrl) {
+    try {
+      const audioDir = path.resolve(process.cwd(), 'public', 'uploads', 'audio');
+      if (!fs.existsSync(audioDir)) fs.mkdirSync(audioDir, { recursive: true });
+
+      const matches = String(dataUrl).match(/^data:audio\/([A-Za-z0-9-+]+);base64,(.+)$/);
+      if (matches && matches[2]) {
+        const ext = matches[1] || 'mp3';
+        const safeName = `audio-${Date.now()}.${ext}`;
+        const filePath = path.join(audioDir, safeName);
+        fs.writeFileSync(filePath, Buffer.from(matches[2], 'base64'));
+        trackUrl = `/uploads/audio/${safeName}`;
+      } else {
+        trackUrl = dataUrl;
+      }
+    } catch (err) {
+      console.error('Audio upload error:', err);
+      return res.status(500).json({ error: 'Error al procesar el archivo de audio' });
+    }
+  }
+
+  if (!trackUrl) return res.status(400).json({ error: 'No se proporcionó URL o archivo de audio' });
+
+  const newTrack = {
+    id: `trk-${Date.now()}`,
+    title: title || 'Pista de Audio Subida',
+    artist: artist || 'Mánager Nerva',
+    url: trackUrl,
+    is_active: true
+  };
+
+  db.background_tracks.forEach(t => t.is_active = false);
+  db.background_tracks.unshift(newTrack);
+  dbManager.save();
+  res.json({ success: true, track: newTrack });
+});
+
+app.post('/api/audio/tracks/:id/activate', (req: Request, res: Response) => {
+  const track = db.background_tracks.find(t => t.id === req.params.id);
+  if (!track) return res.status(404).json({ error: 'Pista no encontrada' });
+
+  db.background_tracks.forEach(t => t.is_active = (t.id === track.id));
+  dbManager.save();
+  res.json({ success: true, activeTrack: track });
+});
+
+// -------------------------------------------------------------
+// ADMIN ACTIONS & SECRET ROOT ROUTE (/directorioraizdenuestraygrandisimaownerv2)
+// -------------------------------------------------------------
+app.get('/api/admin/full-data', (_req: Request, res: Response) => {
+  res.json({
+    profiles: db.profiles,
+    clubs: db.clubs,
+    players: db.players,
+    matches: db.matches,
+    sponsors: db.sponsors,
+    tracks: db.background_tracks,
+    posts: db.club_posts,
+    notifications: db.notifications
+  });
+});
+
+// Real Delete Endpoint (Fixes: "En panel admin no funciona boton de borrar")
+app.post('/api/admin/delete', (req: Request, res: Response) => {
+  const { type, id } = req.body;
+  if (!type || !id) return res.status(400).json({ error: 'Tipo e ID son requeridos' });
+
+  let deleted = false;
+  if (type === 'player') {
+    const idx = db.players.findIndex(p => p.id === id);
+    if (idx !== -1) { db.players.splice(idx, 1); deleted = true; }
+  } else if (type === 'club') {
+    const idx = db.clubs.findIndex(c => c.id === id);
+    if (idx !== -1) { db.clubs.splice(idx, 1); deleted = true; }
+  } else if (type === 'user' || type === 'profile') {
+    const idx = db.profiles.findIndex(p => p.id === id);
+    if (idx !== -1) { db.profiles.splice(idx, 1); deleted = true; }
+  } else if (type === 'post') {
+    const idx = db.club_posts.findIndex(p => p.id === id);
+    if (idx !== -1) { db.club_posts.splice(idx, 1); deleted = true; }
+  } else if (type === 'track') {
+    const idx = db.background_tracks.findIndex(t => t.id === id);
+    if (idx !== -1) { db.background_tracks.splice(idx, 1); deleted = true; }
+  }
+
+  if (!deleted) {
+    return res.status(404).json({ error: 'Elemento no encontrado para eliminar' });
+  }
+
+  dbManager.save();
+  res.json({ success: true, message: `Elemento ${type} con ID ${id} eliminado correctamente.` });
+});
+
+// AI Player Image Generation
+app.post('/api/admin/generate-player-image', (req: Request, res: Response) => {
+  const { playerId, position, nationality } = req.body;
+  const player = db.players.find(p => p.id === playerId);
+  if (!player) return res.status(404).json({ error: 'Jugador no encontrado' });
+
+  // Curated professional realistic football player faces/avatars
+  const athleticFaces = [
+    'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1519085360753-af0119f7cbe7?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?w=300&auto=format&fit=crop&q=80',
+    'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=300&auto=format&fit=crop&q=80'
+  ];
+
+  const selectedAvatar = athleticFaces[Math.floor(Math.random() * athleticFaces.length)];
+  player.avatar_url = selectedAvatar;
+  dbManager.save();
+
+  res.json({
+    success: true,
+    player,
+    imageUrl: selectedAvatar,
+    message: `Imagen de jugador generada y asignada exitosamente con IA.`
+  });
+});
+
+// Admin Club Management
+app.put('/api/admin/clubs/:id', requireAdmin, (req: Request, res: Response) => {
+  const club = db.clubs.find(c => c.id === req.params.id);
+  if (!club) return res.status(404).json({ error: 'Club no encontrado' });
+
+  const { name, crest_url, stadium_level, reputation, fans, budget, formation } = req.body;
+  if (name) club.name = name;
+  if (crest_url) club.crest_url = crest_url;
+  if (stadium_level !== undefined) {
+    club.stadium_level = Number(stadium_level);
+    const sConf = STADIUM_LEVELS.find(l => l.level === club.stadium_level) || STADIUM_LEVELS[0];
+    club.stadium_name = sConf.name;
+    club.stadium_capacity = sConf.capacity;
+  }
+  if (reputation !== undefined) club.reputation = Number(reputation);
+  if (fans !== undefined) club.fans = Math.min(8000000000, Number(fans));
+  if (budget !== undefined) club.budget = Number(budget);
+  if (formation) club.formation = formation;
+
+  // Sync standing
+  const standing = db.standings.find(s => s.club_id === club.id);
+  if (standing) {
+    standing.club_name = club.name;
+    standing.crest_url = club.crest_url;
+  }
+
+  dbManager.save();
+  res.json({ success: true, club });
+});
+
+app.delete('/api/admin/clubs/:id', requireAdmin, (req: Request, res: Response) => {
+  const idx = db.clubs.findIndex(c => c.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Club no encontrado' });
+
+  const removed = db.clubs.splice(idx, 1)[0];
+  db.standings = db.standings.filter(s => s.club_id !== req.params.id);
+  // Free players from this club
+  db.players.forEach(p => {
+    if (p.club_id === req.params.id) {
+      p.club_id = null;
+      p.club_name = 'Agente Libre';
+    }
+  });
+
+  dbManager.save();
+  res.json({ success: true, message: `Club ${removed.name} eliminado.` });
+});
+
+// Admin User Delete
+app.delete('/api/admin/users/:id', requireAdmin, (req: Request, res: Response) => {
+  const admin = getSessionUser(req);
+  if (req.params.id === admin.id) {
+    return res.status(400).json({ error: 'No puedes eliminar tu propia cuenta de administrador' });
+  }
+
+  const idx = db.profiles.findIndex(p => p.id === req.params.id);
+  if (idx === -1) return res.status(404).json({ error: 'Usuario no encontrado' });
+
+  const removed = db.profiles.splice(idx, 1)[0];
+  dbManager.save();
+  res.json({ success: true, message: `Usuario @${removed.username} eliminado.` });
 });
 
 // -------------------------------------------------------------
@@ -1480,6 +2194,29 @@ async function startServer() {
       appType: 'spa'
     });
     app.use(vite.middlewares);
+
+    // Handle SPA HTML routes in development
+    app.use('*', async (req, res, next) => {
+      const url = req.originalUrl;
+      if (url.startsWith('/api') || url.startsWith('/uploads')) {
+        return next();
+      }
+      try {
+        const indexPath = path.resolve(process.cwd(), 'index.html');
+        if (fs.existsSync(indexPath)) {
+          let template = fs.readFileSync(indexPath, 'utf-8');
+          template = await vite.transformIndexHtml(url, template);
+          res.status(200).set({ 'Content-Type': 'text/html' }).end(template);
+        } else {
+          next();
+        }
+      } catch (e: any) {
+        if (vite) {
+          vite.ssrFixStacktrace(e);
+        }
+        next(e);
+      }
+    });
   } else {
     app.use(express.static(path.resolve(process.cwd(), 'dist')));
     app.get('*', (_req, res) => {

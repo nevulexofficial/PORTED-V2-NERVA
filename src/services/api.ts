@@ -129,6 +129,12 @@ export const api = {
   async getAuctions() {
     return request<{ auctions: Auction[] }>('/api/auctions');
   },
+  async startAuctionForPlayer(player_id: string) {
+    return request<{ success: boolean; auction: Auction }>('/api/auctions/start-for-player', {
+      method: 'POST',
+      body: JSON.stringify({ player_id }),
+    });
+  },
   async placeBid(auction_id: string, bid_amount: number) {
     return request<{ success: boolean; auction: Auction; userCoins: number }>('/api/auctions/bid', {
       method: 'POST',
@@ -145,6 +151,9 @@ export const api = {
   },
   async getLeagueMatches(league_id: string) {
     return request<{ matches: Match[] }>(`/api/leagues/${league_id}/matches`);
+  },
+  async getLeagueStats(league_id: string) {
+    return request<{ stats: any }>(`/api/leagues/${league_id}/stats`);
   },
   async simulateMatch() {
     return request<{ match: Match; rewardCoins: number; userCoins: number; userClub: Club }>('/api/matches/simulate', {
@@ -205,6 +214,25 @@ export const api = {
     return request<{ user: Profile }>(`/api/admin/users/${id}/role`, {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+  async deleteAdminUser(id: string) {
+    return request<{ success: boolean; message: string }>(`/api/admin/users/${id}`, {
+      method: 'DELETE',
+    });
+  },
+  async getAdminClubs() {
+    return request<{ clubs: Club[] }>('/api/clubs');
+  },
+  async updateAdminClub(id: string, data: any) {
+    return request<{ success: boolean; club: Club }>(`/api/admin/clubs/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
+  async deleteAdminClub(id: string) {
+    return request<{ success: boolean; message: string }>(`/api/admin/clubs/${id}`, {
+      method: 'DELETE',
     });
   },
   async createAdminPlayer(playerData: any) {
@@ -284,6 +312,100 @@ export const api = {
     return request<{ settings: AppSettings }>('/api/admin/settings', {
       method: 'PUT',
       body: JSON.stringify(data),
+    });
+  },
+
+  // Sponsor Offers (Reputation system)
+  async getSponsorOffers() {
+    return request<{ offers: any[]; reputation: number; canBeSeen: boolean; activeCount: number; maxSponsorsAllowed: number }>('/api/sponsors/offers');
+  },
+  async acceptSponsorOffer(id: string) {
+    return request<{ success: boolean; offer: any; userCoins: number; club: Club }>(`/api/sponsors/offers/${id}/accept`, {
+      method: 'POST',
+    });
+  },
+  async rejectSponsorOffer(id: string) {
+    return request<{ success: boolean; offer: any }>(`/api/sponsors/offers/${id}/reject`, {
+      method: 'POST',
+    });
+  },
+
+  // Stadium Infrastructure
+  async getStadiumInfo() {
+    return request<{ club: Club; currentLevel: any; nextLevel: any; allLevels: any[]; userCoins: number }>('/api/stadium/info');
+  },
+  async upgradeStadium() {
+    return request<{ success: boolean; finishesAt: string; club: Club; userCoins: number }>('/api/stadium/upgrade', {
+      method: 'POST',
+    });
+  },
+  async claimStadiumUpgrade() {
+    return request<{ success: boolean; club: Club }>('/api/stadium/claim-upgrade', {
+      method: 'POST',
+    });
+  },
+
+  // Social Media (NERVA Social)
+  async getSocialPosts() {
+    return request<{ posts: any[] }>('/api/social/posts');
+  },
+  async createSocialPost(data: { title?: string; content: string; type?: string; image_url?: string }) {
+    return request<{ post: any; fans: number }>('/api/social/posts', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async likeSocialPost(id: string) {
+    return request<{ success: boolean; likes: number }>(`/api/social/posts/${id}/like`, {
+      method: 'POST',
+    });
+  },
+
+  // Notifications
+  async getNotifications() {
+    return request<{ notifications: any[] }>('/api/notifications');
+  },
+  async markNotificationRead(id: string) {
+    return request<{ success: boolean }>(`/api/notifications/${id}/read`, {
+      method: 'PUT',
+    });
+  },
+  async deleteNotification(id: string) {
+    return request<{ success: boolean }>(`/api/notifications/${id}`, {
+      method: 'DELETE',
+    });
+  },
+
+  // Background Audio
+  async getAudioTracks() {
+    return request<{ tracks: any[] }>('/api/audio/tracks');
+  },
+  async uploadAudio(data: { title?: string; artist?: string; url?: string; dataUrl?: string }) {
+    return request<{ success: boolean; track: any }>('/api/audio/upload', {
+      method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async activateAudioTrack(id: string) {
+    return request<{ success: boolean; activeTrack: any }>(`/api/audio/tracks/${id}/activate`, {
+      method: 'POST',
+    });
+  },
+
+  // Admin Full Data & Fix Delete
+  async getAdminFullData() {
+    return request<any>('/api/admin/full-data');
+  },
+  async adminDelete(type: 'player' | 'club' | 'user' | 'post' | 'track', id: string) {
+    return request<{ success: boolean; message: string }>('/api/admin/delete', {
+      method: 'POST',
+      body: JSON.stringify({ type, id }),
+    });
+  },
+  async adminGeneratePlayerImage(playerId: string, position?: string, nationality?: string) {
+    return request<{ success: boolean; player: Player; imageUrl: string; message: string }>('/api/admin/generate-player-image', {
+      method: 'POST',
+      body: JSON.stringify({ playerId, position, nationality }),
     });
   }
 };

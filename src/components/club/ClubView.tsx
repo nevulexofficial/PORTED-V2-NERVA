@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
-import { Player, Club, Sponsor } from '../../types/index.ts';
+import { Player, Club } from '../../types/index.ts';
 import { TacticalPitch } from './TacticalPitch.tsx';
+import { AdvancedKitEditor } from './AdvancedKitEditor.tsx';
 import { 
   Shield, Edit3, Crown, Users, Award, 
   ChevronRight, Sparkles, Check, X, SlidersHorizontal, 
@@ -16,12 +17,11 @@ interface ClubViewProps {
 export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
   const { club, user, showToast, refreshUserData } = useAuth();
   const [squad, setSquad] = useState<Player[]>([]);
-  const [sponsors, setSponsors] = useState<Sponsor[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedPlayer, setSelectedPlayer] = useState<Player | null>(null);
   
-  // Tabs: Plantilla vs Camiseta (Kit) vs Sponsors
-  const [activeTab, setActiveTab] = useState<'squad' | 'kit' | 'sponsors'>('squad');
+  // Tabs: Plantilla vs Camiseta (Kit)
+  const [activeTab, setActiveTab] = useState<'squad' | 'kit'>('squad');
 
   // Basic Edit Modal
   const [isEditing, setIsEditing] = useState(false);
@@ -35,19 +35,15 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
   const [primaryColor, setPrimaryColor] = useState('#10b981');
   const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [accentColor, setAccentColor] = useState('#0a0e17');
-  const [kitPattern, setKitPattern] = useState<'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast'>('stripes');
+  const [kitPattern, setKitPattern] = useState<'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast' | 'camo_geometric' | 'radial_burst'>('stripes');
   const [collarType, setCollarType] = useState<'round' | 'v-neck' | 'polo'>('round');
   const [isSavingKit, setIsSavingKit] = useState(false);
 
   useEffect(() => {
     async function loadData() {
       try {
-        const [clubData, spnData] = await Promise.all([
-          api.getMyClub(),
-          api.getSponsors()
-        ]);
+        const clubData = await api.getMyClub();
         setSquad(clubData.squad);
-        setSponsors(spnData.sponsors || []);
         
         if (clubData.club) {
           setEditName(clubData.club.name);
@@ -107,21 +103,6 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
     }
   };
 
-  const handleSignSponsor = async (sponsorId: string) => {
-    try {
-      const res = await api.signSponsor(sponsorId);
-      showToast(`¡Contrato firmado con éxito! Has recibido +${res.sponsor.signing_bonus?.toLocaleString()} monedas`, 'success');
-      refreshUserData();
-      // Reload club to reflect changes
-      const clubData = await api.getMyClub();
-      if (clubData.club) {
-        setSquad(clubData.squad);
-      }
-    } catch (err: any) {
-      showToast(err.message || 'Error al firmar patrocinio', 'error');
-    }
-  };
-
   const handleToggleStarter = async (player: Player) => {
     try {
       const updatedStatus = !player.is_starter;
@@ -138,7 +119,6 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
 
   const starters = squad.filter(p => p.is_starter);
   const bench = squad.filter(p => !p.is_starter);
-  const activeSponsor = sponsors.find(s => s.id === club?.active_sponsor_id);
 
   return (
     <div className="flex flex-col gap-4 pb-24 pt-2 px-4 max-w-md mx-auto">
@@ -168,13 +148,6 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
                   {club?.name}
                 </h1>
                 <p className="text-xs text-slate-400 line-clamp-1">{club?.description}</p>
-                {activeSponsor && (
-                  <div className="flex items-center gap-1.5 mt-0.5">
-                    <span className="text-[9px] text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
-                      ★ Sponsor: {activeSponsor.name}
-                    </span>
-                  </div>
-                )}
               </div>
             </div>
 
@@ -211,7 +184,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
         </div>
       </div>
 
-      {/* Sub-Navigation Switcher (Plantilla / Camiseta / Sponsors) */}
+      {/* Sub-Navigation Switcher (Plantilla / Camiseta) */}
       <div className="flex p-1 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
         <button
           onClick={() => setActiveTab('squad')}
@@ -234,17 +207,6 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
         >
           <Shirt className="w-3.5 h-3.5" />
           <span>Camisetas</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('sponsors')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold transition flex items-center justify-center gap-1.5 ${
-            activeTab === 'sponsors'
-              ? 'bg-emerald-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <DollarSign className="w-3.5 h-3.5" />
-          <span>Sponsors</span>
         </button>
       </div>
 
@@ -384,22 +346,13 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               <circle cx="85" cy="95" r="16" fill="#0f172a" stroke="#10b981" strokeWidth="2" />
               <text x="85" y="99" textAnchor="middle" fill="#10b981" fontSize="12" fontWeight="bold">★</text>
 
-              {/* Sponsor Logo on Chest */}
-              {activeSponsor ? (
-                <g>
-                  <rect x="70" y="145" width="100" height="26" rx="6" fill="#020617" opacity="0.88" stroke="#334155" strokeWidth="1" />
-                  <text x="120" y="162" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900" fontFamily="sans-serif">
-                    {activeSponsor.name.toUpperCase()}
-                  </text>
-                </g>
-              ) : (
-                <g>
-                  <rect x="85" y="145" width="70" height="20" rx="4" fill="#000000" opacity="0.4" />
-                  <text x="120" y="159" textAnchor="middle" fill="#94a3b8" fontSize="8" fontWeight="bold">
-                    NERVA
-                  </text>
-                </g>
-              )}
+              {/* Chest Brand Print */}
+              <g>
+                <rect x="75" y="145" width="90" height="22" rx="5" fill="#000000" opacity="0.5" stroke="#334155" strokeWidth="0.5" />
+                <text x="120" y="160" textAnchor="middle" fill="#f8fafc" fontSize="9" fontWeight="900" fontFamily="sans-serif" letterSpacing="1">
+                  {(club?.short_name || club?.name || 'NERVA').toUpperCase()}
+                </text>
+              </g>
             </svg>
 
             <span className="text-[11px] font-bold text-slate-300 mt-1">
@@ -545,95 +498,6 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               <CheckCircle2 className="w-4 h-4" />
               <span>{isSavingKit ? 'Guardando...' : 'Aplicar Equipación al Club'}</span>
             </button>
-          </div>
-        </div>
-      )}
-
-      {/* TAB 3: SPONSORS (PATROCINADORES OFICIALES) */}
-      {activeTab === 'sponsors' && (
-        <div className="rounded-3xl bg-[#121826] border border-slate-800 p-5 shadow-xl flex flex-col gap-4">
-          <div className="flex items-center justify-between pb-2 border-b border-slate-800">
-            <div className="flex items-center gap-2">
-              <DollarSign className="w-4 h-4 text-amber-400" />
-              <h3 className="text-sm font-black text-white">Patrocinios & Finanzas</h3>
-            </div>
-            <span className="text-[10px] text-slate-400">
-              {activeSponsor ? 'Patrocinador Activo' : 'Sin Patrocinador'}
-            </span>
-          </div>
-
-          <p className="text-xs text-slate-400">
-            Firma contratos comerciales para estampar la marca en tu camiseta y recibir una inyección de monedas al instante y por cada partido:
-          </p>
-
-          <div className="flex flex-col gap-3">
-            {sponsors.map((spn) => {
-              const isCurrent = club?.active_sponsor_id === spn.id;
-              return (
-                <div
-                  key={spn.id}
-                  className={`p-3.5 rounded-2xl border transition flex flex-col gap-2.5 ${
-                    isCurrent
-                      ? 'bg-emerald-950/30 border-emerald-500/50 shadow-md shadow-emerald-500/10'
-                      : 'bg-slate-900/90 border-slate-800 hover:border-slate-700'
-                  }`}
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={spn.icon_url}
-                        alt={spn.name}
-                        className="w-12 h-12 rounded-xl object-cover bg-slate-950 border border-slate-700 p-0.5"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-xs font-black text-white">{spn.name}</h4>
-                          {isCurrent && (
-                            <span className="text-[9px] px-2 py-0.2 rounded-full bg-emerald-500/20 text-emerald-300 font-bold">
-                              FIRMADO
-                            </span>
-                          )}
-                        </div>
-                        <span className="text-[10px] text-slate-400">{spn.category}</span>
-                        <p className="text-[10px] text-slate-400 line-clamp-1 mt-0.5">{spn.description}</p>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Financial Perks Pill */}
-                  <div className="grid grid-cols-2 gap-2 pt-2 border-t border-slate-800/80 text-[10px]">
-                    <div className="flex flex-col">
-                      <span className="text-slate-400">Dinero de Firma:</span>
-                      <span className="text-emerald-400 font-black text-xs tabular-nums">
-                        +{spn.signing_bonus.toLocaleString()} €
-                      </span>
-                    </div>
-                    <div className="flex flex-col">
-                      <span className="text-slate-400">Bonus por Partido:</span>
-                      <span className="text-amber-400 font-black text-xs tabular-nums">
-                        +{spn.match_bonus.toLocaleString()} €
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Sign Action */}
-                  {!isCurrent ? (
-                    <button
-                      onClick={() => handleSignSponsor(spn.id)}
-                      className="w-full py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-xs flex items-center justify-center gap-1.5 transition shadow-md shadow-amber-500/20"
-                    >
-                      <Check className="w-3.5 h-3.5" />
-                      <span>Firmar Contrato (+{spn.signing_bonus.toLocaleString()} €)</span>
-                    </button>
-                  ) : (
-                    <div className="flex items-center justify-center gap-1 text-[11px] font-bold text-emerald-400 py-1">
-                      <CheckCircle2 className="w-4 h-4" />
-                      <span>Patrocinador Oficial en Camiseta</span>
-                    </div>
-                  )}
-                </div>
-              );
-            })}
           </div>
         </div>
       )}

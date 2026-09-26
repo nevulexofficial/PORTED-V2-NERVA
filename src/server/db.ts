@@ -4,7 +4,7 @@ import {
   Profile, Club, Player, League, Standing, Match, 
   TransferListing, TransferOffer, Auction, AuctionBid, 
   Trophy, Achievement, CosmeticItem, RewardCode, CoinTransaction, 
-  AdminAction, AppSettings, Sponsor 
+  AdminAction, AppSettings, Sponsor, SponsorOffer, ClubPost, NotificationItem, BackgroundTrack
 } from '../types/index.ts';
 
 const DATA_DIR = path.resolve(process.cwd(), 'data');
@@ -23,6 +23,10 @@ export interface DatabaseSchema {
   auction_bids: AuctionBid[];
   trophies: Trophy[];
   sponsors: Sponsor[];
+  sponsor_offers: SponsorOffer[];
+  club_posts: ClubPost[];
+  notifications: NotificationItem[];
+  background_tracks: BackgroundTrack[];
   achievements: Achievement[];
   user_achievements: { user_id: string; achievement_id: string; unlocked_at: string }[];
   cosmetics: CosmeticItem[];
@@ -82,6 +86,11 @@ function getInitialData(): DatabaseSchema {
       goals_for: 28,
       goals_against: 11,
       trophies_count: 3,
+      reputation: 1250,
+      fans: 45000,
+      stadium_level: 2,
+      stadium_name: 'Estadio Regional Titan',
+      stadium_capacity: 14000,
       created_at: new Date().toISOString()
     },
     {
@@ -104,6 +113,11 @@ function getInitialData(): DatabaseSchema {
       goals_for: 24,
       goals_against: 9,
       trophies_count: 2,
+      reputation: 1210,
+      fans: 38000,
+      stadium_level: 2,
+      stadium_name: 'Estadio Vanguard',
+      stadium_capacity: 14000,
       created_at: new Date().toISOString()
     },
     {
@@ -126,6 +140,11 @@ function getInitialData(): DatabaseSchema {
       goals_for: 26,
       goals_against: 14,
       trophies_count: 4,
+      reputation: 1180,
+      fans: 52000,
+      stadium_level: 2,
+      stadium_name: 'Olympus Arena',
+      stadium_capacity: 14000,
       created_at: new Date().toISOString()
     },
     {
@@ -148,6 +167,11 @@ function getInitialData(): DatabaseSchema {
       goals_for: 20,
       goals_against: 17,
       trophies_count: 1,
+      reputation: 1140,
+      fans: 26000,
+      stadium_level: 1,
+      stadium_name: 'Graderío Valkyria',
+      stadium_capacity: 6000,
       created_at: new Date().toISOString()
     }
   ];
@@ -465,6 +489,42 @@ function getInitialData(): DatabaseSchema {
     reward_code_uses: [],
     premium_codes: premiumCodes,
     premium_code_uses: [],
+    sponsor_offers: [],
+    club_posts: [
+      {
+        id: 'pst-01',
+        club_id: 'clb-titan-01',
+        club_name: 'Titan FC',
+        club_crest: crestTitan,
+        type: 'statement',
+        title: '¡Comienza la temporada oficial de NERVA!',
+        content: 'La directiva y el cuerpo técnico saludan a la afición. ¡Esta temporada vamos por el título de liga y la gloria deportiva!',
+        image_url: stadiumBanner,
+        likes: 1420,
+        created_at: new Date().toISOString()
+      }
+    ],
+    notifications: [
+      {
+        id: 'notif-01',
+        user_id: defaultUser.id,
+        club_id: 'clb-titan-01',
+        title: '¡Bienvenido a la temporada oficial!',
+        message: 'Revisa tus partidos programados para hoy en los turnos oficiales: 3:00, 8:00 y 11:00.',
+        type: 'match_alert',
+        read: false,
+        created_at: new Date().toISOString()
+      }
+    ],
+    background_tracks: [
+      {
+        id: 'trk-01',
+        title: 'Nerva Champions Theme (Electric Stadium)',
+        artist: 'Nerva Sound Lab',
+        url: 'https://cdn.freesound.org/previews/612/612610_5674468-lq.mp3',
+        is_active: true
+      }
+    ],
     coin_transactions: [
       {
         id: 'tx-welcome-01',
@@ -494,7 +554,30 @@ class DatabaseManager {
       }
       if (fs.existsSync(DB_FILE)) {
         const content = fs.readFileSync(DB_FILE, 'utf-8');
-        return JSON.parse(content);
+        const parsed: DatabaseSchema = JSON.parse(content);
+        if (!parsed.sponsor_offers) parsed.sponsor_offers = [];
+        if (!parsed.club_posts) parsed.club_posts = [];
+        if (!parsed.notifications) parsed.notifications = [];
+        if (!parsed.background_tracks || parsed.background_tracks.length === 0) {
+          parsed.background_tracks = [
+            {
+              id: 'trk-01',
+              title: 'Nerva Champions Theme (Electric Stadium)',
+              artist: 'Nerva Sound Lab',
+              url: 'https://cdn.freesound.org/previews/612/612610_5674468-lq.mp3',
+              is_active: true
+            }
+          ];
+        }
+        parsed.clubs.forEach(c => {
+          if (c.reputation === undefined) c.reputation = 1250;
+          if (c.fans === undefined) c.fans = 250000;
+          if (c.stadium_level === undefined) c.stadium_level = 1;
+          if (!c.stadium_name) c.stadium_name = `${c.name} Arena`;
+          if (!c.stadium_capacity) c.stadium_capacity = 6000;
+          if (!c.active_sponsor_ids) c.active_sponsor_ids = c.active_sponsor_id ? [c.active_sponsor_id] : [];
+        });
+        return parsed;
       }
     } catch (err) {
       console.error('Error reading database file, using defaults:', err);
