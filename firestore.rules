@@ -1,0 +1,67 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny All Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Profiles
+    match /profiles/{userId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Clubs
+    match /clubs/{clubId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Sponsors
+    match /sponsors/{sponsorId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Trophies
+    match /trophies/{trophyId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Leagues
+    match /leagues/{leagueId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Players
+    match /players/{playerId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Matches
+    match /matches/{matchId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Transfers
+    match /transfers/{transferId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+
+    // Codes
+    match /codes/{codeId} {
+      allow read: if true;
+      allow write: if isSignedIn();
+    }
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "name": "NERVA - Mobile Football Manager",
+  "description": "Exclusivo Web Manager de Fútbol móvil con gestión táctica, mercado de fichajes, subastas, ligas competitivas y simulación en tiempo real.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

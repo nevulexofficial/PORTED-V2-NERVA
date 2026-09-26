@@ -1,0 +1,96 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile in NERVA",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "username": { "type": "string" },
+        "display_name": { "type": "string" },
+        "avatar_url": { "type": "string" },
+        "coins": { "type": "number" },
+        "role": { "type": "string" },
+        "premium_active": { "type": "boolean" },
+        "premium_expires_at": { "type": "string" },
+        "club_id": { "type": "string" },
+        "status": { "type": "string" },
+        "theme_color": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "username", "display_name", "role", "coins"]
+    },
+    "Club": {
+      "title": "Club",
+      "description": "Football club entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "owner_id": { "type": "string" },
+        "name": { "type": "string" },
+        "short_name": { "type": "string" },
+        "crest_url": { "type": "string" },
+        "banner_url": { "type": "string" },
+        "primary_kit_color": { "type": "string" },
+        "secondary_kit_color": { "type": "string" },
+        "kit_pattern": { "type": "string" },
+        "sponsor_id": { "type": "string" },
+        "budget": { "type": "number" },
+        "valuation": { "type": "number" },
+        "division_tier": { "type": "number" },
+        "league_id": { "type": "string" },
+        "formation": { "type": "string" },
+        "created_at": { "type": "string" }
+      },
+      "required": ["id", "name", "short_name"]
+    },
+    "Sponsor": {
+      "title": "Sponsor",
+      "description": "Club commercial sponsor contract",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "icon_url": { "type": "string" },
+        "payout_per_match": { "type": "number" },
+        "signing_bonus": { "type": "number" },
+        "requirement_tier": { "type": "number" },
+        "description": { "type": "string" }
+      },
+      "required": ["id", "name", "payout_per_match"]
+    },
+    "Trophy": {
+      "title": "Trophy",
+      "description": "Competition trophy entity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "title": { "type": "string" },
+        "image_url": { "type": "string" },
+        "description": { "type": "string" },
+        "league_id": { "type": "string" },
+        "season": { "type": "string" },
+        "condition": { "type": "string" }
+      },
+      "required": ["id", "title"]
+    }
+  },
+  "firestore": {
+    "/profiles/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles collection"
+    },
+    "/clubs/{clubId}": {
+      "schema": "Club",
+      "description": "Football clubs collection"
+    },
+    "/sponsors/{sponsorId}": {
+      "schema": "Sponsor",
+      "description": "Sponsors contracts catalog"
+    },
+    "/trophies/{trophyId}": {
+      "schema": "Trophy",
+      "description": "Championship trophies"
+    }
+  }
+}
