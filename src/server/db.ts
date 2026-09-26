@@ -51,12 +51,13 @@ function getInitialData(): DatabaseSchema {
     username: 'manager_nerva',
     display_name: 'Director Técnico Nerva',
     avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    coins: 450000,
-    role: 'owner',
-    premium_active: true,
-    premium_expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+    coins: 50000,
+    role: 'user',
+    premium_active: false,
+    premium_expires_at: null,
     club_id: 'clb-titan-01',
     status: 'active',
+    password_hash: '123456',
     created_at: new Date().toISOString()
   };
 

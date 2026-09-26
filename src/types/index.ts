@@ -59,8 +59,8 @@ export interface Club {
   primary_kit_color?: string; // Hex color for jersey main
   secondary_kit_color?: string; // Hex color for stripes/accents
   accent_kit_color?: string; // Hex color for details/borders
-  kit_pattern?: 'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient'; // Pattern
-  collar_type?: 'round' | 'v-neck';
+  kit_pattern?: 'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast'; // Pattern
+  collar_type?: 'round' | 'v-neck' | 'polo';
   active_sponsor_id?: string | null;
   created_at: string;
 }
@@ -89,6 +89,7 @@ export interface Profile {
   premium_expires_at: string | null;
   club_id: string | null;
   status: 'active' | 'suspended';
+  password_hash?: string;
   bio?: string;
   nationality?: string;
   tactical_style?: string;

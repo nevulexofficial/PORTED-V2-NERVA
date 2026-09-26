@@ -16,8 +16,15 @@ interface AuthContextType {
   toasts: ToastInfo[];
   showToast: (message: string, type?: 'success' | 'error' | 'info') => void;
   removeToast: (id: string) => void;
-  login: (username: string) => Promise<void>;
-  register: (username: string, displayName: string, clubName?: string) => Promise<void>;
+  login: (username: string, password?: string) => Promise<void>;
+  register: (
+    username: string, 
+    password?: string, 
+    displayName?: string, 
+    clubName?: string, 
+    avatarUrl?: string, 
+    crestUrl?: string
+  ) => Promise<void>;
   logout: () => void;
   refreshUserData: () => Promise<void>;
   updateUserCoinsLocally: (coins: number) => void;
@@ -51,7 +58,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (data.user) syncProfileToFirestore(data.user);
       if (data.club) syncClubToFirestore(data.club);
     } catch (err) {
-      console.error('Failed to load user state:', err);
+      setUser(null);
+      setClub(null);
     } finally {
       setIsLoading(false);
     }
@@ -62,10 +70,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshUserData();
   }, [refreshUserData]);
 
-  const login = async (username: string) => {
+  const login = async (username: string, password?: string) => {
     setIsLoading(true);
     try {
-      const data = await api.login(username);
+      const data = await api.login(username, password);
       setUser(data.user);
       setClub(data.club);
       if (data.user) syncProfileToFirestore(data.user);
@@ -79,10 +87,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  const register = async (username: string, displayName: string, clubName?: string) => {
+  const register = async (
+    username: string, 
+    password?: string, 
+    displayName?: string, 
+    clubName?: string, 
+    avatarUrl?: string, 
+    crestUrl?: string
+  ) => {
     setIsLoading(true);
     try {
-      const data = await api.register(username, displayName, clubName);
+      const data = await api.register(username, password, displayName, clubName, avatarUrl, crestUrl);
       setUser(data.user);
       setClub(data.club);
       if (data.user) syncProfileToFirestore(data.user);

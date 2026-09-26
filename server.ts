@@ -55,9 +55,13 @@ app.get('/api/auth/me', (req: Request, res: Response) => {
 });
 
 app.post('/api/auth/register', (req: Request, res: Response) => {
-  const { username, display_name, club_name } = req.body;
-  if (!username || !display_name) {
-    return res.status(400).json({ error: 'Faltan campos obligatorios' });
+  const { username, password, display_name, club_name, avatar_url, crest_url } = req.body;
+  if (!username || !password || !display_name) {
+    return res.status(400).json({ error: 'Faltan campos obligatorios (usuario, contraseña o nombre)' });
+  }
+
+  if (password.length < 4) {
+    return res.status(400).json({ error: 'La contraseña debe tener al menos 4 caracteres' });
   }
 
   const existing = db.profiles.find(p => p.username.toLowerCase() === username.toLowerCase());
@@ -73,11 +77,11 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     owner_id: newUserId,
     name: club_name || `${display_name} FC`,
     short_name: (club_name || display_name).substring(0, 3).toUpperCase(),
-    crest_url: '/src/assets/images/crest_titan_fc_1790393819091.jpg',
+    crest_url: crest_url || '/src/assets/images/crest_titan_fc_1790393819091.jpg',
     banner_url: '/src/assets/images/stadium_banner_pitch_1790393808701.jpg',
-    description: 'Club recién ascendido a la competición de NERVA.',
-    budget: 350000,
-    valuation: 15000000,
+    description: 'Club fundado en la liga oficial de NERVA.',
+    budget: 50000,
+    valuation: 8500000,
     division_tier: 1,
     league_id: db.leagues[0].id,
     formation: '4-3-3',
@@ -88,20 +92,24 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
     goals_for: 0,
     goals_against: 0,
     trophies_count: 0,
+    primary_kit_color: '#10b981',
+    secondary_kit_color: '#0f172a',
+    kit_pattern: 'solid',
     created_at: new Date().toISOString()
   };
 
-  const newUser = {
+  const newUser: Profile = {
     id: newUserId,
-    username,
-    display_name,
-    avatar_url: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
-    coins: 350000,
-    role: 'user' as UserRole,
-    premium_active: false,
+    username: username.toLowerCase().trim(),
+    display_name: display_name.trim(),
+    avatar_url: avatar_url || 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80',
+    coins: 50000,
+    role: 'user', // Standard user, never owner or admin
+    premium_active: false, // Never active by default
     premium_expires_at: null,
     club_id: newClubId,
-    status: 'active' as const,
+    status: 'active',
+    password_hash: password,
     created_at: new Date().toISOString()
   };
 
@@ -109,7 +117,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   db.clubs.push(newClub);
 
   // Assign starter players to this new club from free pool or create 11 standard players
-  const availableFreePlayers = db.players.filter(p => p.club_id === null).slice(0, 6);
+  const availableFreePlayers = db.players.filter(p => p.club_id === null).slice(0, 11);
   availableFreePlayers.forEach(p => {
     p.club_id = newClubId;
     p.club_name = newClub.name;
@@ -120,7 +128,7 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
   db.coin_transactions.push({
     id: `tx-${Date.now()}`,
     user_id: newUserId,
-    amount: 350000,
+    amount: 50000,
     type: 'reward_code',
     description: 'Presupuesto inicial de fundación del Club',
     created_at: new Date().toISOString()
@@ -131,11 +139,23 @@ app.post('/api/auth/register', (req: Request, res: Response) => {
 });
 
 app.post('/api/auth/login', (req: Request, res: Response) => {
-  const { username } = req.body;
-  const user = db.profiles.find(p => p.username.toLowerCase() === (username || '').toLowerCase());
-  if (!user) {
-    return res.status(404).json({ error: 'Usuario no encontrado' });
+  const { username, password } = req.body;
+  if (!username) {
+    return res.status(400).json({ error: 'Introduce tu nombre de usuario' });
   }
+
+  const user = db.profiles.find(p => p.username.toLowerCase() === (username || '').toLowerCase().trim());
+  if (!user) {
+    return res.status(404).json({ error: 'Usuario no registrado' });
+  }
+
+  // Validate password
+  if (user.password_hash && password !== undefined) {
+    if (user.password_hash !== password) {
+      return res.status(401).json({ error: 'Contraseña incorrecta' });
+    }
+  }
+
   const club = db.clubs.find(c => c.id === user.club_id) || null;
   res.json({ user, club, token: user.id });
 });

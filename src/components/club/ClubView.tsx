@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
 import { Player, Club, Sponsor } from '../../types/index.ts';
+import { TacticalPitch } from './TacticalPitch.tsx';
 import { 
   Shield, Edit3, Crown, Users, Award, 
   ChevronRight, Sparkles, Check, X, SlidersHorizontal, 
@@ -30,12 +31,12 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
   const [editCrestUrl, setEditCrestUrl] = useState('');
   const [editBannerUrl, setEditBannerUrl] = useState('');
 
-  // Kit Customization State
+  // Kit Customization State (Expanded Patterns)
   const [primaryColor, setPrimaryColor] = useState('#10b981');
   const [secondaryColor, setSecondaryColor] = useState('#ffffff');
   const [accentColor, setAccentColor] = useState('#0a0e17');
-  const [kitPattern, setKitPattern] = useState<'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient'>('stripes');
-  const [collarType, setCollarType] = useState<'round' | 'v-neck'>('round');
+  const [kitPattern, setKitPattern] = useState<'solid' | 'stripes' | 'hoops' | 'sash' | 'gradient' | 'halves' | 'checkered' | 'chevron' | 'pinstripes' | 'sleeves_contrast'>('stripes');
+  const [collarType, setCollarType] = useState<'round' | 'v-neck' | 'polo'>('round');
   const [isSavingKit, setIsSavingKit] = useState(false);
 
   useEffect(() => {
@@ -247,127 +248,26 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
         </button>
       </div>
 
-      {/* TAB 1: PLANTILLA */}
+      {/* TAB 1: PLANTILLA CON CANCHA DE FÚTBOL REALISTA Y POSICIONES */}
       {activeTab === 'squad' && (
         <div className="flex flex-col gap-4">
-          <div className="flex items-center justify-between px-1">
-            <div className="flex items-center gap-2">
-              <Users className="w-4 h-4 text-emerald-400" />
-              <h3 className="text-xs font-bold text-white uppercase tracking-wider">
-                Alineación Táctica
-              </h3>
-            </div>
-            <div className="flex items-center gap-1.5 bg-slate-900 border border-slate-800 px-2.5 py-1 rounded-xl">
-              <span className="text-[10px] text-slate-400">Sistema:</span>
-              <span className="text-[11px] font-bold text-emerald-400">{club?.formation || '4-3-3'}</span>
-            </div>
-          </div>
-
-          {/* Titulares */}
-          <div className="rounded-3xl bg-[#121826] border border-slate-800 p-4 shadow-lg flex flex-col gap-2.5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-emerald-400">
-                Once Titular ({starters.length})
-              </span>
-              <span className="text-[10px] text-slate-400">Toca para ver ficha técnica</span>
-            </div>
-
-            {starters.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3 text-center">No has asignado titulares aún.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {starters.map((player) => (
-                  <div
-                    key={player.id}
-                    onClick={() => setSelectedPlayer(player)}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-900/80 border border-slate-800/80 hover:border-slate-700 transition cursor-pointer touch-press"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700">
-                        <img src={player.avatar_url} alt={player.last_name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-white truncate">
-                            {player.first_name} {player.last_name}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {player.position}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          OVR <strong className="text-white font-semibold">{player.rating}</strong> · {player.nationality} · {player.age} años
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs font-bold text-amber-400 tabular-nums">
-                          {(player.price / 1000000).toFixed(1)}M
-                        </span>
-                        <span className="text-[9px] text-emerald-400 font-semibold">Titular</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-500" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-
-          {/* Banquillo */}
-          <div className="rounded-3xl bg-[#121826] border border-slate-800 p-4 shadow-lg flex flex-col gap-2.5">
-            <div className="flex items-center justify-between mb-1">
-              <span className="text-xs font-bold text-slate-300">
-                Banquillo & Reservas ({bench.length})
-              </span>
-              <span className="text-[10px] text-slate-400">Rotación táctica</span>
-            </div>
-
-            {bench.length === 0 ? (
-              <p className="text-xs text-slate-400 py-3 text-center">No tienes jugadores en el banquillo.</p>
-            ) : (
-              <div className="flex flex-col gap-2">
-                {bench.map((player) => (
-                  <div
-                    key={player.id}
-                    onClick={() => setSelectedPlayer(player)}
-                    className="flex items-center justify-between p-2.5 rounded-2xl bg-slate-900/60 border border-slate-800/60 hover:border-slate-700 transition cursor-pointer touch-press"
-                  >
-                    <div className="flex items-center gap-2.5 min-w-0">
-                      <div className="w-10 h-10 rounded-xl overflow-hidden bg-slate-800 shrink-0 border border-slate-700/60">
-                        <img src={player.avatar_url} alt={player.last_name} className="w-full h-full object-cover" />
-                      </div>
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5">
-                          <span className="text-xs font-bold text-slate-200 truncate">
-                            {player.first_name} {player.last_name}
-                          </span>
-                          <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-slate-800 text-slate-400">
-                            {player.position}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400">
-                          OVR <strong className="text-white font-semibold">{player.rating}</strong> · {player.age} años
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="flex items-center gap-2 shrink-0">
-                      <div className="flex flex-col items-end">
-                        <span className="text-xs font-bold text-slate-300 tabular-nums">
-                          {(player.price / 1000000).toFixed(1)}M
-                        </span>
-                        <span className="text-[9px] text-slate-400">Suplente</span>
-                      </div>
-                      <ChevronRight className="w-4 h-4 text-slate-600" />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
+          <TacticalPitch
+            squad={squad}
+            formation={club?.formation || '4-3-3'}
+            onFormationChange={async (newFmt) => {
+              try {
+                await api.updateMyClub({ formation: newFmt });
+                if (club) club.formation = newFmt;
+                setEditFormation(newFmt);
+                refreshUserData();
+                showToast(`Formación táctica actualizada a ${newFmt}`, 'success');
+              } catch (err: any) {
+                showToast(err.message || 'Error al cambiar formación', 'error');
+              }
+            }}
+            onToggleStarter={handleToggleStarter}
+            onSelectPlayer={(player) => setSelectedPlayer(player)}
+          />
         </div>
       )}
 
@@ -386,17 +286,31 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
 
           {/* Interactive Soccer Jersey SVG Renderer */}
           <div className="relative py-4 flex flex-col items-center justify-center bg-gradient-to-b from-slate-900 to-slate-950 rounded-2xl border border-slate-800 shadow-inner">
-            <svg viewBox="0 0 240 260" className="w-48 h-52 drop-shadow-2xl">
+            <svg viewBox="0 0 240 260" className="w-52 h-56 drop-shadow-2xl">
               <defs>
-                {/* Patterns */}
+                {/* Vertical Stripes Pattern */}
                 <pattern id="stripesPattern" width="40" height="20" patternUnits="userSpaceOnUse">
                   <rect width="20" height="20" fill={primaryColor} />
                   <rect x="20" width="20" height="20" fill={secondaryColor} />
                 </pattern>
+                {/* Horizontal Hoops Pattern */}
                 <pattern id="hoopsPattern" width="20" height="40" patternUnits="userSpaceOnUse">
                   <rect width="20" height="20" fill={primaryColor} />
                   <rect y="20" width="20" height="20" fill={secondaryColor} />
                 </pattern>
+                {/* Checkered / Ajedrezado (Croacia) */}
+                <pattern id="checkeredPattern" width="36" height="36" patternUnits="userSpaceOnUse">
+                  <rect width="18" height="18" fill={primaryColor} />
+                  <rect x="18" width="18" height="18" fill={secondaryColor} />
+                  <rect y="18" width="18" height="18" fill={secondaryColor} />
+                  <rect x="18" y="18" width="18" height="18" fill={primaryColor} />
+                </pattern>
+                {/* Pinstripes / Rayas Finas Elegantes */}
+                <pattern id="pinstripesPattern" width="24" height="20" patternUnits="userSpaceOnUse">
+                  <rect width="24" height="20" fill={primaryColor} />
+                  <rect x="11" width="2.5" height="20" fill={secondaryColor} />
+                </pattern>
+                {/* Gradient */}
                 <linearGradient id="kitGradient" x1="0%" y1="0%" x2="0%" y2="100%">
                   <stop offset="0%" stopColor={primaryColor} />
                   <stop offset="100%" stopColor={secondaryColor} />
@@ -404,30 +318,64 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               </defs>
 
               {/* Sleeves Left & Right */}
-              <path d="M 35,45 L 5,95 L 35,115 L 60,65 Z" fill={secondaryColor} stroke={accentColor} strokeWidth="2" />
-              <path d="M 205,45 L 235,95 L 205,115 L 180,65 Z" fill={secondaryColor} stroke={accentColor} strokeWidth="2" />
+              <path 
+                d="M 35,45 L 5,95 L 35,115 L 60,65 Z" 
+                fill={kitPattern === 'sleeves_contrast' ? secondaryColor : (kitPattern === 'halves' ? primaryColor : secondaryColor)} 
+                stroke={accentColor} 
+                strokeWidth="2" 
+              />
+              <path 
+                d="M 205,45 L 235,95 L 205,115 L 180,65 Z" 
+                fill={kitPattern === 'sleeves_contrast' ? secondaryColor : (kitPattern === 'halves' ? secondaryColor : secondaryColor)} 
+                stroke={accentColor} 
+                strokeWidth="2" 
+              />
 
               {/* Main Jersey Body */}
-              <path
-                d="M 50,45 L 190,45 L 180,240 L 60,240 Z"
-                fill={
-                  kitPattern === 'stripes' ? 'url(#stripesPattern)' :
-                  kitPattern === 'hoops' ? 'url(#hoopsPattern)' :
-                  kitPattern === 'gradient' ? 'url(#kitGradient)' :
-                  primaryColor
-                }
-                stroke={accentColor}
-                strokeWidth="2.5"
-              />
+              {kitPattern === 'halves' ? (
+                <g>
+                  {/* Left Half (Primary) */}
+                  <path d="M 50,45 L 120,45 L 120,240 L 60,240 Z" fill={primaryColor} />
+                  {/* Right Half (Secondary) */}
+                  <path d="M 120,45 L 190,45 L 180,240 L 120,240 Z" fill={secondaryColor} />
+                  {/* Outer Outline */}
+                  <path d="M 50,45 L 190,45 L 180,240 L 60,240 Z" fill="none" stroke={accentColor} strokeWidth="2.5" />
+                </g>
+              ) : (
+                <path
+                  d="M 50,45 L 190,45 L 180,240 L 60,240 Z"
+                  fill={
+                    kitPattern === 'stripes' ? 'url(#stripesPattern)' :
+                    kitPattern === 'hoops' ? 'url(#hoopsPattern)' :
+                    kitPattern === 'checkered' ? 'url(#checkeredPattern)' :
+                    kitPattern === 'pinstripes' ? 'url(#pinstripesPattern)' :
+                    kitPattern === 'gradient' ? 'url(#kitGradient)' :
+                    primaryColor
+                  }
+                  stroke={accentColor}
+                  strokeWidth="2.5"
+                />
+              )}
+
+              {/* Chevron Pattern (V en el pecho) */}
+              {kitPattern === 'chevron' && (
+                <polygon points="50,85 120,130 190,85 190,110 120,155 50,110" fill={secondaryColor} opacity="0.95" />
+              )}
 
               {/* Diagonal Sash if selected */}
               {kitPattern === 'sash' && (
-                <polygon points="50,45 80,45 180,210 180,240" fill={secondaryColor} opacity="0.9" />
+                <polygon points="50,45 85,45 180,205 180,240" fill={secondaryColor} opacity="0.9" />
               )}
 
               {/* Collar Design */}
               {collarType === 'v-neck' ? (
                 <polygon points="95,45 145,45 120,75" fill={accentColor} />
+              ) : collarType === 'polo' ? (
+                <g>
+                  {/* Polo Collar with lapels */}
+                  <polygon points="88,45 152,45 142,78 120,62 98,78" fill={accentColor} stroke="#ffffff" strokeWidth="0.5" />
+                  <line x1="120" y1="62" x2="120" y2="88" stroke="#ffffff" strokeWidth="1" />
+                </g>
               ) : (
                 <path d="M 95,45 Q 120,75 145,45 Z" fill={accentColor} />
               )}
@@ -439,8 +387,8 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               {/* Sponsor Logo on Chest */}
               {activeSponsor ? (
                 <g>
-                  <rect x="75" y="145" width="90" height="24" rx="6" fill="#020617" opacity="0.85" stroke="#334155" strokeWidth="1" />
-                  <text x="120" y="161" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900" fontFamily="sans-serif">
+                  <rect x="70" y="145" width="100" height="26" rx="6" fill="#020617" opacity="0.88" stroke="#334155" strokeWidth="1" />
+                  <text x="120" y="162" textAnchor="middle" fill="#ffffff" fontSize="9" fontWeight="900" fontFamily="sans-serif">
                     {activeSponsor.name.toUpperCase()}
                   </text>
                 </g>
@@ -455,7 +403,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
             </svg>
 
             <span className="text-[11px] font-bold text-slate-300 mt-1">
-              {club?.name} · Temporada 2026/27
+              {club?.name} · Temporada Oficial 2026/27
             </span>
           </div>
 
@@ -474,7 +422,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
                   className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
                 />
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
-                  {['#10b981', '#1e40af', '#dc2626', '#f59e0b', '#0284c7', '#7c3aed', '#111827', '#ffffff'].map(c => (
+                  {['#10b981', '#1e40af', '#dc2626', '#f59e0b', '#0284c7', '#7c3aed', '#111827', '#ffffff', '#e11d48'].map(c => (
                     <button
                       key={c}
                       type="button"
@@ -489,7 +437,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
 
             <div>
               <label className="text-xs font-bold text-slate-300 flex items-center justify-between mb-1.5">
-                <span>Color Secundario (Rayas / Mangas)</span>
+                <span>Color Secundario (Rayas / Contrastes)</span>
                 <span className="font-mono text-slate-400 text-[11px]">{secondaryColor}</span>
               </label>
               <div className="flex items-center gap-2">
@@ -500,7 +448,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
                   className="w-10 h-10 rounded-xl cursor-pointer bg-transparent border-0"
                 />
                 <div className="flex gap-1.5 overflow-x-auto no-scrollbar py-1">
-                  {['#ffffff', '#0f172a', '#fbbf24', '#38bdf8', '#f87171', '#34d399', '#a855f7'].map(c => (
+                  {['#ffffff', '#0f172a', '#fbbf24', '#38bdf8', '#f87171', '#34d399', '#a855f7', '#fb7185'].map(c => (
                     <button
                       key={c}
                       type="button"
@@ -513,18 +461,23 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               </div>
             </div>
 
-            {/* Pattern Selection */}
+            {/* Expanded Pattern Selection */}
             <div>
               <label className="text-xs font-bold text-slate-300 block mb-1.5">
-                Estilo de Estampado / Patrón
+                Estilo de Diseño / Patrón (10 Diseños Profesionales)
               </label>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                 {[
-                  { id: 'solid', label: 'Lisa' },
-                  { id: 'stripes', label: 'Rayas' },
-                  { id: 'hoops', label: 'Franjas' },
-                  { id: 'sash', label: 'Banda' },
-                  { id: 'gradient', label: 'Degradado' },
+                  { id: 'solid', label: 'Lisa Clásica' },
+                  { id: 'stripes', label: 'Rayas Verticales' },
+                  { id: 'hoops', label: 'Franjas Horizontales' },
+                  { id: 'sash', label: 'Banda Diagonal' },
+                  { id: 'halves', label: 'Mitad y Mitad' },
+                  { id: 'checkered', label: 'Ajedrezado' },
+                  { id: 'chevron', label: 'Pectoral en V' },
+                  { id: 'pinstripes', label: 'Líneas Finas' },
+                  { id: 'sleeves_contrast', label: 'Mangas Contraste' },
+                  { id: 'gradient', label: 'Degradado Atlético' },
                 ].map(pat => (
                   <button
                     key={pat.id}
@@ -532,7 +485,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
                     onClick={() => setKitPattern(pat.id as any)}
                     className={`py-2 px-2 rounded-xl text-xs font-bold border transition ${
                       kitPattern === pat.id
-                        ? 'bg-emerald-600 text-white border-emerald-400 shadow-md'
+                        ? 'bg-emerald-600 text-white border-emerald-400 shadow-md shadow-emerald-600/20'
                         : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
                     }`}
                   >
@@ -547,7 +500,7 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               <label className="text-xs font-bold text-slate-300 block mb-1.5">
                 Tipo de Cuello
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => setCollarType('round')}
@@ -569,6 +522,17 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
                   }`}
                 >
                   Cuello en V
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setCollarType('polo')}
+                  className={`py-2 rounded-xl text-xs font-bold border transition ${
+                    collarType === 'polo'
+                      ? 'bg-emerald-600 text-white border-emerald-400'
+                      : 'bg-slate-900 text-slate-400 border-slate-800 hover:text-white'
+                  }`}
+                >
+                  Cuello Polo
                 </button>
               </div>
             </div>

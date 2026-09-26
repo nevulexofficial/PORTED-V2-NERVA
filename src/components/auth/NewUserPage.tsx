@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
-import { Shield, User, Camera, Upload, ArrowRight, Check, Flame, Trophy, Sparkles } from 'lucide-react';
+import { Shield, User, Camera, Upload, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
 
 interface NewUserPageProps {
   onSuccess?: () => void;
@@ -15,15 +15,19 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
 
   // Register Fields
   const [username, setUsername] = useState('');
+  const [password, setPassword] = useState('');
   const [displayName, setDisplayName] = useState('');
   const [clubName, setClubName] = useState('');
   const [avatarPreview, setAvatarPreview] = useState<string>('https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&auto=format&fit=crop&q=80');
   const [crestPreview, setCrestPreview] = useState<string>('/src/assets/images/crest_titan_fc_1790393819091.jpg');
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadingCrest, setUploadingCrest] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
 
   // Login Fields
   const [loginUsername, setLoginUsername] = useState('');
+  const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
 
   // Handle Real File Upload for Avatar
   const handleAvatarFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -87,20 +91,24 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
       return;
     }
 
-    setLoading(true);
-    setLoadingText('Fundando club y generando plantilla...');
-    try {
-      await register(username.trim().toLowerCase(), displayName.trim(), clubName.trim() || undefined);
-      
-      // Update avatar or crest if custom uploaded
-      if (avatarPreview && !avatarPreview.includes('unsplash')) {
-        await api.updateProfile(undefined, avatarPreview);
-      }
-      if (crestPreview && !crestPreview.includes('titan_fc')) {
-        await api.updateMyClub({ crest_url: crestPreview });
-      }
+    if (!password || password.length < 4) {
+      showToast('La contraseña debe tener al menos 4 caracteres', 'error');
+      return;
+    }
 
-      showToast('¡Cuenta y club creados con éxito!', 'success');
+    setLoading(true);
+    setLoadingText('Fundando club y registrando en la base de datos...');
+    try {
+      await register(
+        username.trim().toLowerCase(), 
+        password, 
+        displayName.trim(), 
+        clubName.trim() || undefined,
+        avatarPreview,
+        crestPreview
+      );
+
+      showToast('¡Cuenta y club fundados con éxito!', 'success');
       if (onSuccess) onSuccess();
     } catch (err: any) {
       showToast(err.message || 'Error al registrar la cuenta', 'error');
@@ -117,29 +125,19 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
       return;
     }
 
+    if (!loginPassword) {
+      showToast('Introduce tu contraseña', 'error');
+      return;
+    }
+
     setLoading(true);
-    setLoadingText('Autenticando en Firestore...');
+    setLoadingText('Verificando credenciales en base de datos...');
     try {
-      await login(loginUsername.trim().toLowerCase());
+      await login(loginUsername.trim().toLowerCase(), loginPassword);
       showToast('Sesión iniciada con éxito', 'success');
       if (onSuccess) onSuccess();
     } catch (err: any) {
-      showToast(err.message || 'Usuario no encontrado', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Quick Demo Access
-  const handleQuickDemo = async () => {
-    setLoading(true);
-    setLoadingText('Cargando cuenta de demostración...');
-    try {
-      await login('manager_nerva');
-      showToast('¡Bienvenido al modo Director Técnico!', 'success');
-      if (onSuccess) onSuccess();
-    } catch (err: any) {
-      showToast(err.message || 'Error de acceso demo', 'error');
+      showToast(err.message || 'Credenciales inválidas', 'error');
     } finally {
       setLoading(false);
     }
@@ -164,7 +162,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
           NERVA
         </h1>
         <p className="text-xs text-slate-400 font-medium tracking-wide mt-0.5">
-          Web Manager de Fútbol Móvil
+          Web Manager de Fútbol Oficial
         </p>
       </div>
 
@@ -196,20 +194,20 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
           </button>
         </div>
 
-        {/* Loading Overlay */}
+        {/* Loading Indicator */}
         {loading && (
           <div className="p-6 flex flex-col items-center justify-center text-center gap-2">
             <div className="w-8 h-8 rounded-full border-2 border-emerald-500 border-t-transparent animate-spin mb-1" />
             <span className="text-xs font-bold text-white">{loadingText}</span>
-            <span className="text-[10px] text-slate-400">Sincronizando con base de datos en tiempo real</span>
+            <span className="text-[10px] text-slate-400">Base de datos Firestore sincronizada</span>
           </div>
         )}
 
         {/* REGISTER FORM */}
         {!loading && mode === 'register' && (
           <form onSubmit={handleSubmitRegister} className="flex flex-col gap-3.5">
+            {/* Real File Upload Avatar */}
             <div className="flex items-center gap-3 p-3 rounded-2xl bg-slate-900 border border-slate-800">
-              {/* Avatar Upload Preview */}
               <div className="relative group shrink-0">
                 <div className="w-14 h-14 rounded-2xl overflow-hidden bg-slate-950 border-2 border-emerald-500/40 p-0.5">
                   <img
@@ -218,7 +216,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
                     className="w-full h-full object-cover rounded-xl"
                   />
                 </div>
-                <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center cursor-pointer shadow-md hover:bg-emerald-500">
+                <label className="absolute -bottom-1 -right-1 w-6 h-6 rounded-lg bg-emerald-600 text-white flex items-center justify-center cursor-pointer shadow-md hover:bg-emerald-500 transition">
                   <Camera className="w-3.5 h-3.5" />
                   <input
                     type="file"
@@ -232,7 +230,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
               <div className="flex flex-col min-w-0">
                 <span className="text-xs font-bold text-white">Foto de Mánager</span>
                 <span className="text-[10px] text-slate-400">
-                  {uploadingAvatar ? 'Subiendo archivo real...' : 'Toca el icono para subir tu foto real'}
+                  {uploadingAvatar ? 'Subiendo imagen real...' : 'Toca el icono para subir tu foto real'}
                 </span>
               </div>
             </div>
@@ -240,7 +238,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
             {/* Inputs */}
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Usuario Mánager (@handle único)
+                Usuario Mánager (@handle)
               </label>
               <input
                 type="text"
@@ -254,7 +252,30 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
 
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Nombre Visible del Mánager
+                Contraseña
+              </label>
+              <div className="relative">
+                <input
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Mínimo 4 caracteres"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                Nombre del Director Técnico
               </label>
               <input
                 type="text"
@@ -268,13 +289,13 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
 
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Nombre de tu Club de Fútbol
+                Nombre de tu Club
               </label>
               <input
                 type="text"
                 value={clubName}
                 onChange={(e) => setClubName(e.target.value)}
-                placeholder="ej. Manchester Titans FC"
+                placeholder="ej. Titans FC"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
               />
             </div>
@@ -288,7 +309,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
                 <div>
                   <span className="text-xs font-bold text-white block">Escudo Oficial</span>
                   <span className="text-[10px] text-slate-400">
-                    {uploadingCrest ? 'Subiendo imagen...' : 'Sube tu logo o escudo propio'}
+                    {uploadingCrest ? 'Subiendo escudo...' : 'Sube tu logo o escudo propio'}
                   </span>
                 </div>
               </div>
@@ -309,7 +330,7 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
               type="submit"
               className="mt-2 w-full py-3.5 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition touch-press"
             >
-              <span>Fundar Club & Comenzar</span>
+              <span>Crear Cuenta & Fundar Club</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
@@ -320,45 +341,54 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
           <form onSubmit={handleSubmitLogin} className="flex flex-col gap-3.5">
             <div>
               <label className="text-[11px] font-bold text-slate-300 block mb-1">
-                Tu Nombre de Usuario
+                Nombre de Usuario
               </label>
               <input
                 type="text"
                 required
                 value={loginUsername}
                 onChange={(e) => setLoginUsername(e.target.value)}
-                placeholder="ej. manager_nerva"
+                placeholder="ej. guardiola_26"
                 className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
               />
+            </div>
+
+            <div>
+              <label className="text-[11px] font-bold text-slate-300 block mb-1">
+                Contraseña
+              </label>
+              <div className="relative">
+                <input
+                  type={showLoginPassword ? 'text' : 'password'}
+                  required
+                  value={loginPassword}
+                  onChange={(e) => setLoginPassword(e.target.value)}
+                  placeholder="Tu contraseña"
+                  className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-3.5 pr-10 py-2.5 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-emerald-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowLoginPassword(!showLoginPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-white"
+                >
+                  {showLoginPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               className="mt-1 w-full py-3.5 rounded-2xl bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs uppercase tracking-wider shadow-lg shadow-emerald-600/30 flex items-center justify-center gap-2 transition touch-press"
             >
-              <span>Iniciar Sesión en NERVA</span>
+              <span>Iniciar Sesión</span>
               <ArrowRight className="w-4 h-4" />
             </button>
           </form>
         )}
-
-        {/* Quick Demo Button */}
-        {!loading && (
-          <div className="pt-2 border-t border-slate-800/80 flex flex-col gap-2 text-center">
-            <span className="text-[10px] text-slate-500">¿Quieres probar sin registrarte?</span>
-            <button
-              type="button"
-              onClick={handleQuickDemo}
-              className="py-2.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-slate-300 text-xs font-bold border border-slate-800 transition"
-            >
-              Entrar con Cuenta Demo Principal
-            </button>
-          </div>
-        )}
       </div>
 
       <p className="text-[10px] text-slate-500 text-center mt-6">
-        NERVA Mobile Manager · Todos los datos protegidos y sincronizados en la nube
+        NERVA Manager · Cuentas reales autenticadas y sincronizadas en la base de datos
       </p>
     </div>
   );

@@ -33,18 +33,25 @@ export const api = {
   async getMe() {
     return request<{ user: Profile; club: Club | null }>('/api/auth/me');
   },
-  async login(username: string) {
+  async login(username: string, password?: string) {
     const res = await request<{ user: Profile; club: Club | null; token: string }>('/api/auth/login', {
       method: 'POST',
-      body: JSON.stringify({ username }),
+      body: JSON.stringify({ username, password }),
     });
     localStorage.setItem(TOKEN_KEY, res.token);
     return res;
   },
-  async register(username: string, display_name: string, club_name?: string) {
+  async register(
+    username: string, 
+    password?: string, 
+    display_name?: string, 
+    club_name?: string, 
+    avatar_url?: string, 
+    crest_url?: string
+  ) {
     const res = await request<{ user: Profile; club: Club; token: string }>('/api/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ username, display_name, club_name }),
+      body: JSON.stringify({ username, password, display_name, club_name, avatar_url, crest_url }),
     });
     localStorage.setItem(TOKEN_KEY, res.token);
     return res;
