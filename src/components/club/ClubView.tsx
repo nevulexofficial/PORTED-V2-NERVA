@@ -4,10 +4,12 @@ import { api } from '../../services/api.ts';
 import { Player, Club } from '../../types/index.ts';
 import { TacticalPitch } from './TacticalPitch.tsx';
 import { AdvancedKitEditor } from './AdvancedKitEditor.tsx';
+import { PlayerPositionPitch } from '../common/PlayerPositionPitch.tsx';
+import { canAdvanceToLevel, getLevelPrerequisites } from '../../utils/clubLevels.ts';
 import { 
   Shield, Edit3, Crown, Users, Award, 
   ChevronRight, Sparkles, Check, X, SlidersHorizontal, 
-  Shirt, DollarSign, Palette, CheckCircle2 
+  Shirt, DollarSign, Palette, CheckCircle2, Lock, ArrowUpCircle
 } from 'lucide-react';
 
 interface ClubViewProps {
@@ -117,6 +119,27 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
     }
   };
 
+  // Club Level Up Handler (Level 0 to 80)
+  const [levelingUp, setLevelingUp] = useState(false);
+  const currentLevel = club?.level || 0;
+  const nextLevel = Math.min(80, currentLevel + 1);
+  const levelCheck = canAdvanceToLevel(club || {}, nextLevel);
+  const currentPrereqs = getLevelPrerequisites(currentLevel);
+  const nextPrereqs = getLevelPrerequisites(nextLevel);
+
+  const handleLevelUp = async () => {
+    setLevelingUp(true);
+    try {
+      const res = await api.levelUpClub();
+      showToast(res.message, 'success');
+      refreshUserData();
+    } catch (err: any) {
+      showToast(err.message || 'No cumples con todos los prerequisitos para subir de nivel', 'error');
+    } finally {
+      setLevelingUp(false);
+    }
+  };
+
   const starters = squad.filter(p => p.is_starter);
   const bench = squad.filter(p => !p.is_starter);
 
@@ -181,6 +204,107 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               <span className="text-sm font-bold text-amber-400 tabular-nums">{club?.trophies_count || 0}</span>
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* Official 80-Level Progression System Card (0 Default to 80 Monumental Milestone) */}
+      <div className="p-4 rounded-3xl bg-gradient-to-br from-[#121826] via-slate-900 to-[#0e1726] border border-amber-500/30 shadow-xl flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-xl bg-amber-500/20 border border-amber-500/40 flex items-center justify-center font-black text-amber-400 text-sm">
+              {currentLevel}
+            </div>
+            <div>
+              <span className="text-xs font-black text-white flex items-center gap-1.5">
+                <span>Nivel de Club: {currentLevel} de 80</span>
+                <span className="text-[9px] px-1.5 py-0.2 rounded bg-amber-500/20 text-amber-300 font-bold uppercase">
+                  {currentPrereqs.title}
+                </span>
+              </span>
+              <span className="text-[10px] text-slate-400 block">
+                {currentLevel >= 80 ? '👑 ¡NIVEL MÁXIMO ALCANZADO! Estadio Monumental Habilitado' : `Próximo nivel: Nivel ${nextLevel}`}
+              </span>
+            </div>
+          </div>
+
+          {currentLevel < 80 && (
+            <button
+              onClick={handleLevelUp}
+              disabled={!levelCheck.canAdvance || levelingUp}
+              className={`px-3 py-1.5 rounded-xl text-xs font-black uppercase tracking-wider flex items-center gap-1 shadow-md transition touch-press ${
+                levelCheck.canAdvance
+                  ? 'bg-gradient-to-r from-amber-500 to-emerald-500 text-slate-950 hover:brightness-110 shadow-amber-950/40'
+                  : 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-60 border border-slate-700'
+              }`}
+            >
+              <ArrowUpCircle className="w-3.5 h-3.5" />
+              <span>{levelingUp ? 'Subiendo...' : `Subir a Nivel ${nextLevel}`}</span>
+            </button>
+          )}
+        </div>
+
+        {/* Level Progress Bar (0 to 80) */}
+        <div className="flex flex-col gap-1">
+          <div className="flex justify-between text-[10px] text-slate-400 font-medium">
+            <span>Progreso General de Rango</span>
+            <span className="font-bold text-amber-400 tabular-nums">
+              {Math.round((currentLevel / 80) * 100)}% (Hito Monumental a los 80)
+            </span>
+          </div>
+          <div className="w-full h-2 rounded-full bg-slate-950 border border-slate-800 overflow-hidden">
+            <div
+              className="h-full bg-gradient-to-r from-amber-500 via-orange-500 to-emerald-400 transition-all duration-500"
+              style={{ width: `${Math.max(2, (currentLevel / 80) * 100)}%` }}
+            />
+          </div>
+        </div>
+
+        {/* Prerequisites Checklist to next level */}
+        {currentLevel < 80 && (
+          <div className="grid grid-cols-2 gap-2 p-2.5 rounded-2xl bg-slate-950/80 border border-slate-800/80 text-[10px]">
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${(club?.xp || 0) >= nextPrereqs.xp_required ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span className="text-slate-300 truncate">
+                XP: {(club?.xp || 0).toLocaleString()} / {nextPrereqs.xp_required.toLocaleString()}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${(club?.reputation || 1000) >= nextPrereqs.reputation_required ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span className="text-slate-300 truncate">
+                Reputación: {club?.reputation || 1000} / {nextPrereqs.reputation_required}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${(club?.matches_won || 0) >= nextPrereqs.matches_won_required ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span className="text-slate-300 truncate">
+                Victorias: {club?.matches_won || 0} / {nextPrereqs.matches_won_required}
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5">
+              <span className={`w-2 h-2 rounded-full shrink-0 ${(club?.fans || 0) >= nextPrereqs.fans_required ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+              <span className="text-slate-300 truncate">
+                Afición: {(club?.fans || 0).toLocaleString()} / {nextPrereqs.fans_required.toLocaleString()}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* Monumental Prerequisite Notice Required by user */}
+        <div className={`p-2.5 rounded-xl border flex items-center justify-between text-[10px] ${
+          currentLevel >= 80
+            ? 'bg-emerald-950/40 border-emerald-500/40 text-emerald-300 font-bold'
+            : 'bg-amber-950/20 border-amber-500/30 text-amber-300'
+        }`}>
+          <div className="flex items-center gap-1.5">
+            {currentLevel >= 80 ? <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> : <Lock className="w-3.5 h-3.5 text-amber-400" />}
+            <span>{currentLevel >= 80 ? '¡Estadio Monumental Construible y Habilitado!' : 'Estadio Monumental: Desbloqueable estrictamente al alcanzar Nivel 80.'}</span>
+          </div>
+          <span className="font-mono font-bold text-white tabular-nums">
+            {currentLevel}/80
+          </span>
         </div>
       </div>
 
@@ -536,6 +660,51 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
               </button>
             </div>
 
+            {/* Injury Status Banner */}
+            {(selectedPlayer.status === 'injured' || (selectedPlayer.injury_matches_remaining && selectedPlayer.injury_matches_remaining > 0)) && (
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2.5">
+                <span className="text-xl">🏥</span>
+                <div>
+                  <strong className="block font-black text-rose-200 uppercase tracking-wide">
+                    Lesionado ({selectedPlayer.injury_name || 'Sobrecarga muscular'})
+                  </strong>
+                  <span className="text-[10px] text-rose-300/80">
+                    Baja médica confirmada por {selectedPlayer.injury_matches_remaining || 1} jornada(s). No disponible para la alineación.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Experience / Match Progression Bar */}
+            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-300 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  Progreso por Experiencia de Partido
+                </span>
+                <span className="font-mono text-emerald-400 font-bold text-[11px]">
+                  {(selectedPlayer.xp || 0)} / 300 XP
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, ((selectedPlayer.xp || 0) / 300) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[9.5px] text-slate-500">
+                Al jugar partidos oficiales acumula XP y sube +1 OVR (hasta su potencial máx: {selectedPlayer.potential})
+              </span>
+            </div>
+
+            {/* Mini Football Pitch Tactical Position Viewer */}
+            <div className="my-3">
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Demarcación en Cancha de Fútbol
+              </span>
+              <PlayerPositionPitch position={selectedPlayer.position} />
+            </div>
+
             <div className="grid grid-cols-2 gap-3 my-4">
               <div className="flex items-center justify-between p-3 rounded-xl bg-slate-900 border border-slate-800">
                 <span className="text-xs text-slate-400 font-medium">Valoración OVR</span>
@@ -575,14 +744,27 @@ export const ClubView: React.FC<ClubViewProps> = ({ onOpenPremium }) => {
             </div>
 
             <button
-              onClick={() => handleToggleStarter(selectedPlayer)}
+              onClick={() => {
+                if (!selectedPlayer.is_starter && (selectedPlayer.status === 'injured' || (selectedPlayer.injury_matches_remaining && selectedPlayer.injury_matches_remaining > 0))) {
+                  showToast('Este jugador está lesionado y no puede alinearse hasta recibir el alta médica', 'error');
+                  return;
+                }
+                handleToggleStarter(selectedPlayer);
+              }}
+              disabled={Boolean(!selectedPlayer.is_starter && (selectedPlayer.status === 'injured' || ((selectedPlayer.injury_matches_remaining ?? 0) > 0)))}
               className={`w-full h-12 rounded-xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition touch-press ${
                 selectedPlayer.is_starter
                   ? 'bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700'
+                  : (selectedPlayer.status === 'injured' || (selectedPlayer.injury_matches_remaining && selectedPlayer.injury_matches_remaining > 0))
+                  ? 'bg-rose-950/40 text-rose-400 border border-rose-800/40 cursor-not-allowed opacity-60'
                   : 'bg-emerald-600 hover:bg-emerald-500 text-white'
               }`}
             >
-              {selectedPlayer.is_starter ? 'Enviar al Banquillo' : 'Alinear en el Once Titular'}
+              {selectedPlayer.is_starter
+                ? 'Enviar al Banquillo'
+                : (selectedPlayer.status === 'injured' || (selectedPlayer.injury_matches_remaining && selectedPlayer.injury_matches_remaining > 0))
+                ? '🏥 No disponible por lesión'
+                : 'Alinear en el Once Titular'}
             </button>
           </div>
         </div>

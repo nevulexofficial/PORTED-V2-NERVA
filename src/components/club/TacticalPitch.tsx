@@ -212,6 +212,12 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                     <span className="absolute -top-1 -right-1 bg-amber-500 text-slate-950 font-black text-[9px] px-1 rounded-full leading-tight border border-amber-300 shadow">
                       {player.rating}
                     </span>
+                    {/* Injury Badge if injured */}
+                    {(player.status === 'injured' || (player.injury_matches_remaining && player.injury_matches_remaining > 0)) && (
+                      <span className="absolute -top-1 -left-1 bg-rose-600 text-white font-black text-[8px] px-1 rounded-full leading-tight border border-white shadow animate-pulse">
+                        🏥
+                      </span>
+                    )}
                     {/* Position Label Tag */}
                     <span className="absolute -bottom-1 -left-1 bg-emerald-700 text-white font-bold text-[8px] px-1 rounded leading-tight shadow border border-emerald-500">
                       {pos.role}
@@ -270,14 +276,27 @@ export const TacticalPitch: React.FC<TacticalPitchProps> = ({
                   <span>·</span>
                   <span className="text-amber-400 font-bold">{player.rating}</span>
                 </div>
+                {(player.status === 'injured' || (player.injury_matches_remaining && player.injury_matches_remaining > 0)) && (
+                  <span className="mt-1 text-[8.5px] font-black px-1.5 py-0.2 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/40">
+                    🏥 Baja {player.injury_matches_remaining || 1}j
+                  </span>
+                )}
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
+                    if (player.status === 'injured' || (player.injury_matches_remaining && player.injury_matches_remaining > 0)) return;
                     onToggleStarter(player);
                   }}
-                  className="mt-1.5 w-full py-1 rounded-lg bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 text-[9px] font-bold border border-emerald-500/30 transition"
+                  disabled={Boolean(player.status === 'injured' || ((player.injury_matches_remaining ?? 0) > 0))}
+                  className={`mt-1.5 w-full py-1 rounded-lg text-[9px] font-bold border transition ${
+                    (player.status === 'injured' || (player.injury_matches_remaining && player.injury_matches_remaining > 0))
+                      ? 'bg-rose-950/30 text-rose-400 border-rose-800/40 cursor-not-allowed opacity-60'
+                      : 'bg-emerald-600/20 hover:bg-emerald-600/40 text-emerald-300 border-emerald-500/30'
+                  }`}
                 >
-                  Meter Titular
+                  {(player.status === 'injured' || (player.injury_matches_remaining && player.injury_matches_remaining > 0))
+                    ? 'Lesionado'
+                    : 'Meter Titular'}
                 </button>
               </div>
             ))}

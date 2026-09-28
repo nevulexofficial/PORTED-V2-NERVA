@@ -5,30 +5,21 @@ import { TransferListing, Auction, PlayerPosition, Player } from '../../types/in
 import { 
   ShoppingBag, Flame, Search, Filter, 
   Coins, Clock, CheckCircle2, ChevronRight, Tag, X, PlusCircle,
-  Star, Bell, Sparkles, Award, Shield, AlertCircle, ArrowUpRight
+  Star, Bell, Sparkles, Award, Shield, AlertCircle, ArrowUpRight, Eye
 } from 'lucide-react';
 import { triggerPushNotification } from '../common/PushNotificationBanner.tsx';
+import { PlayerPositionPitch } from '../common/PlayerPositionPitch.tsx';
 
 export const MarketView: React.FC = () => {
   const { user, showToast, updateUserCoinsLocally } = useAuth();
-  const [activeTab, setActiveTab] = useState<'transfers' | 'auctions' | 'watchlist'>('transfers');
+  const [activeTab, setActiveTab] = useState<'transfers' | 'auctions'>('transfers');
   const [listings, setListings] = useState<TransferListing[]>([]);
   const [auctions, setAuctions] = useState<Auction[]>([]);
   const [allPlayers, setAllPlayers] = useState<Player[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Watchlist state
-  const [watchlist, setWatchlist] = useState<string[]>(() => {
-    try {
-      const saved = localStorage.getItem('nerva_watchlist');
-      return saved ? JSON.parse(saved) : ['ply-16', 'ply-12'];
-    } catch {
-      return ['ply-16', 'ply-12'];
-    }
-  });
-
-  // Track notified auctions in this session to prevent spamming
-  const [notifiedAuctions, setNotifiedAuctions] = useState<Set<string>>(new Set());
+  // Selected Player for Detailed Inspection & Mini Football Pitch
+  const [selectedPlayerForDetails, setSelectedPlayerForDetails] = useState<Player | null>(null);
 
   // Real-time ticking timer for the 6-minute countdown
   const [now, setNow] = useState<number>(Date.now());
@@ -39,11 +30,6 @@ export const MarketView: React.FC = () => {
     }, 1000);
     return () => clearInterval(timer);
   }, []);
-
-  // Save watchlist
-  useEffect(() => {
-    localStorage.setItem('nerva_watchlist', JSON.stringify(watchlist));
-  }, [watchlist]);
 
   // Filters
   const [search, setSearch] = useState('');
@@ -77,19 +63,6 @@ export const MarketView: React.FC = () => {
       setMySquad(squadRes.squad ? squadRes.squad.filter(p => p.status === 'active') : []);
       if (playersRes.players) setAllPlayers(playersRes.players);
 
-      // Check if any player in watchlist is in active auction and hasn't notified yet
-      aucRes.auctions.forEach((auc: Auction) => {
-        if (auc.status === 'active' && watchlist.includes(auc.player_id) && !notifiedAuctions.has(auc.id)) {
-          triggerPushNotification({
-            title: `🔥 ¡Subasta en Vivo de tu Lista de Seguimiento!`,
-            body: `${auc.player.first_name} ${auc.player.last_name} (${auc.player.position} · OVR ${auc.player.rating}) está en subasta de 6 minutos. ¡Entra a pujar!`,
-            player_id: auc.player_id,
-            auction_id: auc.id,
-            action_label: 'Ir a la Subasta'
-          });
-          setNotifiedAuctions(prev => new Set(prev).add(auc.id));
-        }
-      });
     } catch (err) {
       console.error('Error fetching market:', err);
     } finally {
@@ -104,51 +77,7 @@ export const MarketView: React.FC = () => {
       loadData();
     }, 8000);
     return () => clearInterval(poll);
-  }, [watchlist]);
-
-  const toggleWatchlist = (playerId: string, player?: Player) => {
-    if (watchlist.includes(playerId)) {
-      setWatchlist(prev => prev.filter(id => id !== playerId));
-      showToast('Jugador retirado de tu lista de seguimiento', 'info');
-    } else {
-      setWatchlist(prev => [...prev, playerId]);
-      showToast('⭐ ¡Jugador agregado a tu lista de seguimiento! Recibirás alertas push cuando entre en subasta.', 'success');
-      
-      // If currently in auction, fire push notification preview
-      const inAuction = auctions.find(a => a.player_id === playerId && a.status === 'active');
-      if (inAuction && player) {
-        triggerPushNotification({
-          title: `🔥 ¡Subasta Activa de tu Lista!`,
-          body: `${player.first_name} ${player.last_name} ya está en subasta de 6 minutos.`,
-          player_id: player.id,
-          auction_id: inAuction.id,
-          action_label: 'Pujar Ahora'
-        });
-      }
-    }
-  };
-
-  // Launch a watched player into an active 6-minute auction
-  const handleLaunchToAuction = async (player: Player) => {
-    try {
-      const res = await api.startAuctionForPlayer(player.id);
-      showToast(`¡Subasta oficial de 6 minutos iniciada para ${player.first_name} ${player.last_name}!`, 'success');
-      
-      // Trigger push notification banner
-      triggerPushNotification({
-        title: `🔥 ¡Subasta en Vivo de tu Lista de Seguimiento!`,
-        body: `${player.first_name} ${player.last_name} (${player.position} · OVR ${player.rating}) acaba de entrar en subasta de 6 minutos. ¡Encabeza la puja para ficharlo!`,
-        player_id: player.id,
-        auction_id: res.auction.id,
-        action_label: 'Pujar Inmediatamente'
-      });
-
-      await loadData();
-      setActiveTab('auctions');
-    } catch (err: any) {
-      showToast(err.message || 'Error al iniciar subasta', 'error');
-    }
-  };
+  }, []);
 
   const handleBuyPlayer = async (listing: TransferListing) => {
     if (!user) return;
@@ -230,8 +159,6 @@ export const MarketView: React.FC = () => {
     return matchPos && matchRating && matchSearch;
   });
 
-  const watchlistPlayers = allPlayers.filter(p => watchlist.includes(p.id));
-
   return (
     <div className="flex flex-col gap-4 pb-24 pt-2 px-4 max-w-md mx-auto select-none">
       {/* Top Header Bar & Sell Button */}
@@ -244,16 +171,18 @@ export const MarketView: React.FC = () => {
           <p className="text-xs text-slate-400">Traspasos, subastas y alertas push</p>
         </div>
 
-        <button
-          onClick={() => setIsSellModalOpen(true)}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition touch-press shadow-md"
-        >
-          <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
-          <span>Vender</span>
-        </button>
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setIsSellModalOpen(true)}
+            className="flex items-center gap-1 px-3 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold transition touch-press shadow-md"
+          >
+            <PlusCircle className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Vender</span>
+          </button>
+        </div>
       </div>
 
-      {/* Tabs Switcher: Fichajes vs Subastas vs Seguimiento */}
+      {/* Tabs Switcher: Fichajes vs Subastas */}
       <div className="flex p-1 rounded-2xl bg-slate-900 border border-slate-800 shadow-md">
         <button
           onClick={() => setActiveTab('transfers')}
@@ -264,7 +193,7 @@ export const MarketView: React.FC = () => {
           }`}
         >
           <Tag className="w-3.5 h-3.5" />
-          <span>Mercado</span>
+          <span>Fichajes Directos</span>
         </button>
         <button
           onClick={() => setActiveTab('auctions')}
@@ -275,23 +204,7 @@ export const MarketView: React.FC = () => {
           }`}
         >
           <Flame className="w-3.5 h-3.5" />
-          <span>Subastas (6m)</span>
-        </button>
-        <button
-          onClick={() => setActiveTab('watchlist')}
-          className={`flex-1 py-2 rounded-xl text-xs font-bold flex items-center justify-center gap-1.5 transition relative ${
-            activeTab === 'watchlist'
-              ? 'bg-purple-600 text-white shadow-md'
-              : 'text-slate-400 hover:text-white'
-          }`}
-        >
-          <Star className="w-3.5 h-3.5" />
-          <span>Seguimiento</span>
-          {watchlist.length > 0 && (
-            <span className="w-4 h-4 rounded-full bg-amber-400 text-slate-950 font-black text-[9px] flex items-center justify-center -ml-0.5">
-              {watchlist.length}
-            </span>
-          )}
+          <span>Subastas en Vivo (6m)</span>
         </button>
       </div>
 
@@ -341,7 +254,6 @@ export const MarketView: React.FC = () => {
             ) : (
               filteredListings.map((listing) => {
                 const p = listing.player;
-                const isWatched = watchlist.includes(p.id);
                 return (
                   <div
                     key={listing.id}
@@ -373,18 +285,11 @@ export const MarketView: React.FC = () => {
                         </div>
                       </div>
 
-                      {/* Watchlist Star Toggle */}
-                      <button
-                        onClick={() => toggleWatchlist(p.id, p)}
-                        className={`p-2 rounded-xl border transition ${
-                          isWatched
-                            ? 'bg-amber-500/20 text-amber-400 border-amber-500/40'
-                            : 'bg-slate-900 text-slate-500 border-slate-800 hover:text-slate-300'
-                        }`}
-                        title={isWatched ? 'En lista de seguimiento' : 'Añadir a lista de seguimiento'}
-                      >
-                        <Star className={`w-4 h-4 ${isWatched ? 'fill-amber-400' : ''}`} />
-                      </button>
+                      {(p.status === 'injured' || ((p.injury_matches_remaining ?? 0) > 0)) && (
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                          🏥 Lesionado ({p.injury_matches_remaining || 1}j)
+                        </span>
+                      )}
                     </div>
 
                     {/* Stats bar */}
@@ -405,12 +310,23 @@ export const MarketView: React.FC = () => {
                         </span>
                       </div>
 
-                      <button
-                        onClick={() => handleBuyPlayer(listing)}
-                        className="px-4 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-emerald-950/40 touch-press"
-                      >
-                        Fichar Jugador
-                      </button>
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedPlayerForDetails(p)}
+                          className="px-2.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1 transition touch-press"
+                          title="Ver Ficha y Cancha"
+                        >
+                          <Eye className="w-3.5 h-3.5 text-emerald-400" />
+                          <span>Cancha</span>
+                        </button>
+
+                        <button
+                          onClick={() => handleBuyPlayer(listing)}
+                          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs uppercase tracking-wider shadow-md shadow-emerald-950/40 touch-press"
+                        >
+                          Fichar
+                        </button>
+                      </div>
                     </div>
                   </div>
                 );
@@ -440,7 +356,6 @@ export const MarketView: React.FC = () => {
             const timeLeft = formatTimeLeft(auc.ends_at);
             const isFinished = timeLeft === '00:00' || auc.status === 'completed';
             const isWinning = user && auc.highest_bidder_id === user.id;
-            const isWatched = watchlist.includes(auc.player_id);
 
             return (
               <div
@@ -456,10 +371,9 @@ export const MarketView: React.FC = () => {
                     <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30">
                       SUBASTA PRO
                     </span>
-                    {isWatched && (
-                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 flex items-center gap-1 border border-purple-500/30">
-                        <Star className="w-3 h-3 fill-purple-300" />
-                        EN TU SEGUIMIENTO
+                    {(auc.player.status === 'injured' || ((auc.player.injury_matches_remaining ?? 0) > 0)) && (
+                      <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 border border-rose-500/30">
+                        🏥 Lesionado
                       </span>
                     )}
                   </div>
@@ -495,13 +409,6 @@ export const MarketView: React.FC = () => {
                       OVR {auc.player.rating} · Pot {auc.player.potential} · {auc.player.nationality} ({auc.player.age} años)
                     </span>
                   </div>
-
-                  <button
-                    onClick={() => toggleWatchlist(auc.player_id, auc.player)}
-                    className="p-2 rounded-xl bg-slate-900 border border-slate-800 text-slate-400 hover:text-amber-400"
-                  >
-                    <Star className={`w-4 h-4 ${isWatched ? 'fill-amber-400 text-amber-400' : ''}`} />
-                  </button>
                 </div>
 
                 {/* Live Leader Status Card */}
@@ -527,16 +434,27 @@ export const MarketView: React.FC = () => {
 
                 {/* Bid Button */}
                 {!isFinished ? (
-                  <button
-                    onClick={() => {
-                      setActiveAuctionForBid(auc);
-                      setBidAmountInput(String(auc.current_bid + 50000));
-                    }}
-                    className="w-full py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40 touch-press"
-                  >
-                    <Flame className="w-4 h-4 fill-slate-950" />
-                    <span>Pujar Ahora (+50.000 €)</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <button
+                      onClick={() => setSelectedPlayerForDetails(auc.player)}
+                      className="px-3 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 text-xs font-bold flex items-center gap-1 transition touch-press"
+                      title="Ver Ficha y Cancha del Jugador"
+                    >
+                      <Eye className="w-3.5 h-3.5 text-amber-400" />
+                      <span>Cancha</span>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setActiveAuctionForBid(auc);
+                        setBidAmountInput(String(auc.current_bid + 50000));
+                      }}
+                      className="flex-1 py-2.5 rounded-xl bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-1.5 shadow-lg shadow-amber-950/40 touch-press"
+                    >
+                      <Flame className="w-4 h-4 fill-slate-950" />
+                      <span>Pujar (+50.000 €)</span>
+                    </button>
+                  </div>
                 ) : (
                   <div className="py-2 px-3 rounded-xl bg-slate-900 border border-slate-800 text-center text-xs font-bold text-slate-400">
                     🏆 Subasta concluida. El jugador ha sido asignado a <strong className="text-white">{auc.highest_bidder_club_name || 'Comprador'}</strong>.
@@ -545,97 +463,6 @@ export const MarketView: React.FC = () => {
               </div>
             );
           })}
-        </div>
-      )}
-
-      {/* ============================================================== */}
-      {/* TAB 3: LISTA DE SEGUIMIENTO (ALERTAS PUSH SIMULADAS)           */}
-      {/* ============================================================== */}
-      {activeTab === 'watchlist' && (
-        <div className="flex flex-col gap-3.5">
-          <div className="p-3.5 rounded-2xl bg-gradient-to-br from-purple-500/15 via-slate-900 to-indigo-500/10 border border-purple-500/30 flex flex-col gap-1.5 shadow-lg">
-            <div className="flex items-center gap-1.5 text-xs font-black text-purple-300 uppercase tracking-wide">
-              <Bell className="w-4 h-4 text-purple-400" />
-              <span>Notificaciones Push de Jugadores Favoritos</span>
-            </div>
-            <p className="text-[11px] text-slate-300 leading-snug">
-              Los jugadores que agregues a esta lista dispararán una <strong>notificación push flotante</strong> en tu pantalla en el momento exacto en que ingresen a la subasta en vivo de 6 minutos.
-            </p>
-          </div>
-
-          {watchlistPlayers.length === 0 ? (
-            <div className="p-8 rounded-3xl bg-[#121826] border border-slate-800 text-center flex flex-col items-center justify-center gap-2">
-              <Star className="w-8 h-8 text-slate-600" />
-              <span className="text-xs text-slate-400 font-medium">
-                No tienes futbolistas en seguimiento. Toca la estrella ⭐ en cualquier jugador del mercado para agregarlo.
-              </span>
-            </div>
-          ) : (
-            watchlistPlayers.map((p) => {
-              const liveAuction = auctions.find(a => a.player_id === p.id && a.status === 'active');
-              return (
-                <div
-                  key={p.id}
-                  className="p-3.5 rounded-3xl bg-[#121826] border border-slate-800 flex flex-col gap-3 shadow-lg"
-                >
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <img
-                        src={p.avatar_url}
-                        alt={p.last_name}
-                        className="w-12 h-12 rounded-2xl object-cover border border-slate-700 shadow-md"
-                      />
-                      <div>
-                        <div className="flex items-center gap-1.5">
-                          <h4 className="text-sm font-black text-white">{p.first_name} {p.last_name}</h4>
-                          <span className="text-[10px] font-black px-1.5 py-0.2 rounded bg-purple-500/20 text-purple-300">
-                            {p.position}
-                          </span>
-                        </div>
-                        <span className="text-[10px] text-slate-400 block">
-                          OVR {p.rating} · Pot {p.potential} · {p.nationality}
-                        </span>
-                        <span className="text-[9px] text-emerald-400 font-mono">
-                          Valor: {(p.price / 1000000).toFixed(1)}M €
-                        </span>
-                      </div>
-                    </div>
-
-                    <button
-                      onClick={() => toggleWatchlist(p.id, p)}
-                      className="p-2 rounded-xl bg-purple-500/20 text-purple-300 border border-purple-500/30"
-                      title="Dejar de seguir"
-                    >
-                      <Star className="w-4 h-4 fill-purple-300" />
-                    </button>
-                  </div>
-
-                  {liveAuction ? (
-                    <div className="flex items-center justify-between p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30">
-                      <span className="text-xs font-black text-amber-400 flex items-center gap-1">
-                        <Flame className="w-3.5 h-3.5" />
-                        ¡EN SUBASTA AHORA ({formatTimeLeft(liveAuction.ends_at)})!
-                      </span>
-                      <button
-                        onClick={() => setActiveTab('auctions')}
-                        className="px-3 py-1 rounded-lg bg-amber-500 hover:bg-amber-400 text-slate-950 font-black text-[10px] uppercase"
-                      >
-                        Pujar
-                      </button>
-                    </div>
-                  ) : (
-                    <button
-                      onClick={() => handleLaunchToAuction(p)}
-                      className="w-full py-2 rounded-xl bg-slate-900 hover:bg-slate-800 border border-slate-700 text-xs font-bold text-slate-200 flex items-center justify-center gap-1.5 transition"
-                    >
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      <span>Lanzar a Subasta de 6 Minutos (Probar Notificación Push)</span>
-                    </button>
-                  )}
-                </div>
-              );
-            })
-          )}
         </div>
       )}
 
@@ -739,6 +566,123 @@ export const MarketView: React.FC = () => {
                 Publicar Venta
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Interactive Player Detail Modal with Mini Football Pitch */}
+      {selectedPlayerForDetails && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/80 backdrop-blur-sm p-0 sm:p-4 select-none">
+          <div className="w-full max-w-sm bg-[#121826] border border-slate-800 rounded-t-3xl sm:rounded-3xl p-5 shadow-2xl flex flex-col gap-3.5 max-h-[92vh] overflow-y-auto animate-in slide-in-from-bottom duration-200">
+            <div className="w-12 h-1 bg-slate-700 rounded-full mx-auto sm:hidden -mt-1" />
+
+            <div className="flex items-start justify-between pb-2 border-b border-slate-800">
+              <div className="flex items-center gap-3">
+                <img
+                  src={selectedPlayerForDetails.avatar_url}
+                  alt={selectedPlayerForDetails.last_name}
+                  className="w-14 h-14 rounded-2xl object-cover border-2 border-emerald-500/50 shadow-md"
+                />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <h3 className="text-base font-black text-white">
+                      {selectedPlayerForDetails.first_name} {selectedPlayerForDetails.last_name}
+                    </h3>
+                    <span className="text-xs font-black px-1.5 py-0.2 rounded bg-emerald-500/20 text-emerald-300">
+                      {selectedPlayerForDetails.position}
+                    </span>
+                  </div>
+                  <span className="text-xs text-slate-400 block mt-0.5">
+                    {selectedPlayerForDetails.nationality} · {selectedPlayerForDetails.age} años · Salario: {selectedPlayerForDetails.salary?.toLocaleString()} €/sem
+                  </span>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setSelectedPlayerForDetails(null)}
+                className="p-1 rounded-lg text-slate-400 hover:text-white"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Injury Status Banner */}
+            {(selectedPlayerForDetails.status === 'injured' || ((selectedPlayerForDetails.injury_matches_remaining ?? 0) > 0)) && (
+              <div className="p-3 rounded-2xl bg-rose-500/15 border border-rose-500/40 text-xs text-rose-300 flex items-center gap-2.5">
+                <span className="text-xl">🏥</span>
+                <div>
+                  <strong className="block font-black text-rose-200 uppercase tracking-wide">
+                    Lesionado ({selectedPlayerForDetails.injury_name || 'Sobrecarga muscular'})
+                  </strong>
+                  <span className="text-[10px] text-rose-300/80">
+                    Baja médica por {selectedPlayerForDetails.injury_matches_remaining || 1} jornada(s). No disponible para disputar partidos.
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {/* Experience / Match Progression Bar */}
+            <div className="p-3 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col gap-1.5">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-bold text-slate-300 flex items-center gap-1">
+                  <Sparkles className="w-3.5 h-3.5 text-emerald-400" />
+                  Progreso por Experiencia de Partido
+                </span>
+                <span className="font-mono text-emerald-400 font-bold text-[11px]">
+                  {(selectedPlayerForDetails.xp || 0)} / 300 XP
+                </span>
+              </div>
+              <div className="w-full h-2 rounded-full bg-slate-800 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-emerald-500 to-teal-400 rounded-full transition-all duration-300"
+                  style={{ width: `${Math.min(100, (((selectedPlayerForDetails.xp || 0)) / 300) * 100)}%` }}
+                />
+              </div>
+              <span className="text-[9.5px] text-slate-500">
+                Al jugar partidos oficiales acumula XP y sube +1 OVR (hasta su potencial máx: {selectedPlayerForDetails.potential})
+              </span>
+            </div>
+
+            {/* Mini Football Pitch Tactical Position Component */}
+            <div>
+              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-1">
+                Demarcación Táctica en Cancha
+              </span>
+              <PlayerPositionPitch position={selectedPlayerForDetails.position} />
+            </div>
+
+            {/* Ratings Bar */}
+            <div className="grid grid-cols-2 gap-2 text-center">
+              <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">Valoración OVR</span>
+                <span className="text-lg font-black text-emerald-400 tabular-nums">
+                  {selectedPlayerForDetails.rating}
+                </span>
+              </div>
+              <div className="p-2 rounded-xl bg-slate-900 border border-slate-800">
+                <span className="text-[10px] text-slate-400 block">Potencial Máx</span>
+                <span className="text-lg font-black text-amber-400 tabular-nums">
+                  {selectedPlayerForDetails.potential}
+                </span>
+              </div>
+            </div>
+
+            {/* 6 Key Stats Grid */}
+            <div className="grid grid-cols-6 gap-1 bg-slate-900/80 p-2.5 rounded-2xl border border-slate-800 text-center font-mono text-[10px]">
+              <div><span className="text-slate-400 block text-[9px]">PAC</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.pace || 75}</span></div>
+              <div><span className="text-slate-400 block text-[9px]">SHO</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.shooting || 75}</span></div>
+              <div><span className="text-slate-400 block text-[9px]">PAS</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.passing || 75}</span></div>
+              <div><span className="text-slate-400 block text-[9px]">DRI</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.dribbling || 75}</span></div>
+              <div><span className="text-slate-400 block text-[9px]">DEF</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.defense || 75}</span></div>
+              <div><span className="text-slate-400 block text-[9px]">PHY</span><span className="font-bold text-white">{selectedPlayerForDetails.stats?.physical || 75}</span></div>
+            </div>
+
+            <button
+              onClick={() => setSelectedPlayerForDetails(null)}
+              className="w-full py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-bold transition"
+            >
+              Cerrar Ficha
+            </button>
           </div>
         </div>
       )}

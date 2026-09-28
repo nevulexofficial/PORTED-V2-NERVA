@@ -106,6 +106,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
       showToast(res.message || '¡Código canjeado con éxito!', 'success');
       setRedeemCodeInput('');
       await refreshUserData();
+      if ((res as any).isAdminElevated || (res as any).user?.role === 'owner' || (res as any).user?.role === 'admin') {
+        setAccountSubSection('panel');
+        setTimeout(() => {
+          showToast('👑 ¡Modo Administrador Supremo activado! Ya tienes permisos para gestionar todo el sistema.', 'success');
+        }, 500);
+      }
     } catch (err: any) {
       showToast(err.message || 'Código inválido o ya utilizado', 'error');
     } finally {
@@ -269,13 +275,13 @@ export const MoreView: React.FC<MoreViewProps> = ({
         )}
       </div>
 
-      {/* 4 Main Sub-Tabs */}
+      {/* 4 Main Sub-Tabs with Varied Section Colors */}
       <div className="grid grid-cols-4 gap-1 p-1 bg-slate-900/90 rounded-2xl border border-slate-800">
         {[
-          { id: 'account', label: 'Cuenta', icon: User },
-          { id: 'social', label: 'Fans', icon: MessageSquare },
-          { id: 'sound', label: 'Sonido', icon: Volume2 },
-          { id: 'sponsors', label: 'Sponsors', icon: Shield },
+          { id: 'account', label: 'Cuenta', icon: User, color: 'text-sky-400', activeBg: 'bg-sky-600' },
+          { id: 'social', label: 'Fans', icon: MessageSquare, color: 'text-pink-400', activeBg: 'bg-pink-600' },
+          { id: 'sound', label: 'Sonido', icon: Volume2, color: 'text-amber-400', activeBg: 'bg-amber-600' },
+          { id: 'sponsors', label: 'Sponsors', icon: Shield, color: 'text-emerald-400', activeBg: 'bg-emerald-600' },
         ].map((tab) => {
           const Icon = tab.icon;
           const isActive = activeSubTab === tab.id;
@@ -285,12 +291,12 @@ export const MoreView: React.FC<MoreViewProps> = ({
               onClick={() => setActiveSubTab(tab.id as any)}
               className={`py-2 px-1 rounded-xl text-xs font-bold flex flex-col items-center justify-center gap-1 transition ${
                 isActive
-                  ? 'bg-emerald-600 text-white shadow-md'
-                  : 'text-slate-400 hover:text-white'
+                  ? `${tab.activeBg} text-white shadow-md`
+                  : `${tab.color} hover:bg-slate-800/60`
               }`}
             >
               <Icon className="w-4 h-4" />
-              <span className="text-[10px]">{tab.label}</span>
+              <span className={`text-[10px] ${isActive ? 'text-white' : 'text-slate-400'}`}>{tab.label}</span>
             </button>
           );
         })}
@@ -660,6 +666,38 @@ export const MoreView: React.FC<MoreViewProps> = ({
                     <img src={post.image_url} alt="Post attachment" className="w-full h-full object-cover" />
                   </div>
                 )}
+
+                {/* Real-time Dynamic Fan Growth based on 10-Minute Threshold and Club Reputation */}
+                {(() => {
+                  const elapsedMs = Date.now() - new Date(post.created_at).getTime();
+                  const elapsedMins = Math.floor(elapsedMs / 60000);
+                  const isUnder10 = elapsedMins < 10;
+                  const minsLeft = Math.max(1, 10 - elapsedMins);
+                  const clubRep = club?.reputation || 1000;
+                  const fansGained = (post as any).fans_gained ?? (isUnder10 ? 0 : Math.floor((clubRep / 100) * (elapsedMins - 10) * 18));
+
+                  return isUnder10 ? (
+                    <div className="p-2.5 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 text-slate-300">
+                        <Clock className="w-3.5 h-3.5 text-amber-400" />
+                        <span>Primeros minutos: <strong className="text-white">0 fans ganados</strong></span>
+                      </div>
+                      <span className="text-[10px] text-amber-400 font-bold">
+                        Aumentará en {minsLeft} min según reputación ({clubRep} pts)
+                      </span>
+                    </div>
+                  ) : (
+                    <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/30 flex items-center justify-between text-[11px]">
+                      <div className="flex items-center gap-1.5 text-emerald-400 font-medium">
+                        <Sparkles className="w-3.5 h-3.5" />
+                        <span>Afición impulsada por reputación ({clubRep} pts):</span>
+                      </div>
+                      <span className="font-black text-emerald-300 text-xs tabular-nums">
+                        +{fansGained.toLocaleString()} fans ({elapsedMins} min)
+                      </span>
+                    </div>
+                  );
+                })()}
 
                 <div className="flex items-center justify-between pt-2 border-t border-slate-800/60">
                   <button

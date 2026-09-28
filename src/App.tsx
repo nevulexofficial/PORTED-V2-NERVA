@@ -15,8 +15,12 @@ import { SettingsModal } from './components/settings/SettingsModal.tsx';
 import { PremiumModal } from './components/premium/PremiumModal.tsx';
 import { LabsAdminModal } from './components/labs/LabsAdminModal.tsx';
 import { MatchSimulationModal } from './components/match/MatchSimulationModal.tsx';
+import { LiveTransmissionsView } from './components/match/LiveTransmissionsView.tsx';
 import { AuthModal } from './components/auth/AuthModal.tsx';
 import { NewUserPage } from './components/auth/NewUserPage.tsx';
+import { NervaCloudIcon } from './components/common/NervaCloudIcon.tsx';
+import { PushNotificationBanner, triggerPushNotification } from './components/common/PushNotificationBanner.tsx';
+import { api } from './services/api.ts';
 
 function MainApp() {
   const { user, isLoading, refreshUserData } = useAuth();
@@ -30,6 +34,42 @@ function MainApp() {
     return window.location.pathname === '/directorioraizdenuestraygrandisimaownerv2' ||
       window.location.hash.includes('directorioraizdenuestraygrandisimaownerv2');
   });
+
+  // Global Watchlist Auction Monitor (Simulated Push Notifications)
+  useEffect(() => {
+    if (!user) return;
+    const notifiedAuctionIds = new Set<string>();
+
+    const checkWatchlistAuctions = async () => {
+      try {
+        const savedWatchlist = localStorage.getItem('nerva_watchlist');
+        const watchlist: string[] = savedWatchlist ? JSON.parse(savedWatchlist) : ['ply-16', 'ply-12'];
+        if (watchlist.length === 0) return;
+
+        const res = await api.getAuctions();
+        if (!res.auctions) return;
+
+        res.auctions.forEach((auc) => {
+          if (auc.status === 'active' && watchlist.includes(auc.player_id) && !notifiedAuctionIds.has(auc.id)) {
+            notifiedAuctionIds.add(auc.id);
+            triggerPushNotification({
+              title: `🔥 ¡Subasta en Vivo de tu Lista de Seguimiento!`,
+              body: `${auc.player.first_name} ${auc.player.last_name} (${auc.player.position} · OVR ${auc.player.rating}) acaba de entrar en subasta oficial de 6 minutos. ¡Entra a pujar!`,
+              player_id: auc.player_id,
+              auction_id: auc.id,
+              action_label: 'Pujar Inmediatamente'
+            });
+          }
+        });
+      } catch {
+        // Background polling fallback
+      }
+    };
+
+    checkWatchlistAuctions();
+    const interval = setInterval(checkWatchlistAuctions, 8000);
+    return () => clearInterval(interval);
+  }, [user]);
 
   useEffect(() => {
     const handlePopState = () => {
@@ -45,9 +85,7 @@ function MainApp() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-[#0a0e17] flex flex-col items-center justify-center text-center p-4">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-tr from-emerald-500 to-teal-400 p-1 flex items-center justify-center animate-pulse mb-4 shadow-xl shadow-emerald-950/50">
-          <span className="font-sports text-3xl font-black text-slate-950">N</span>
-        </div>
+        <NervaCloudIcon className="w-20 h-20 mb-4 animate-pulse" glow={true} />
         <span className="font-sports text-2xl tracking-widest text-white font-bold">
           CARGANDO NERVA...
         </span>
@@ -91,6 +129,9 @@ function MainApp() {
         {/* Global Toast notifications */}
         <ToastContainer />
 
+        {/* Global Simulated Push Notifications (Watchlist auctions, match alerts) */}
+        <PushNotificationBanner onNavigateToAuction={() => setActiveTab('market')} />
+
         {/* Top Mobile App Bar */}
         <Header
           onOpenSettings={() => setIsSettingsOpen(true)}
@@ -108,6 +149,10 @@ function MainApp() {
 
           {activeTab === 'club' && (
             <ClubView onOpenPremium={() => setIsPremiumOpen(true)} />
+          )}
+
+          {activeTab === 'tv' && (
+            <LiveTransmissionsView />
           )}
 
           {activeTab === 'market' && (

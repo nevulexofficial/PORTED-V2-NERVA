@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { Shield, Sparkles, User, ArrowRight, CheckCircle2 } from 'lucide-react';
+import { NervaCloudIcon } from '../common/NervaCloudIcon.tsx';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -49,9 +50,7 @@ export const AuthModal: React.FC<AuthModalProps> = ({ isOpen, onClose }) => {
       <div className="w-full max-w-sm rounded-3xl bg-[#121826] border border-slate-800 p-6 shadow-2xl flex flex-col gap-4">
         {/* Brand Lockup */}
         <div className="flex flex-col items-center text-center gap-1.5 pb-2">
-          <div className="w-14 h-14 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 p-1 flex items-center justify-center shadow-lg shadow-emerald-950/50 mb-1">
-            <Shield className="w-8 h-8 text-slate-950" />
-          </div>
+          <NervaCloudIcon className="w-16 h-16 mb-1" glow={true} />
           <span className="font-sports text-3xl tracking-widest text-white font-bold">
             NERVA MANAGER
           </span>

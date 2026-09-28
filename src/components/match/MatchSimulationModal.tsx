@@ -43,8 +43,21 @@ export const MatchSimulationModal: React.FC<MatchSimulationModalProps> = ({
   // Replay Mode Speed (Only active for finished matches)
   const [replaySpeed, setReplaySpeed] = useState<number>(1);
   const [replayElapsed, setReplayElapsed] = useState<number>(0);
+  const [peruTime, setPeruTime] = useState<string>('');
 
   const timerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    const update = () => {
+      setPeruTime(new Date().toLocaleTimeString('es-PE', {
+        timeZone: 'America/Lima',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }));
+    };
+    update();
+    const interval = setInterval(update, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   // Load Daily Matches (2 per user per day)
   const loadDailyMatches = async () => {
@@ -274,6 +287,12 @@ export const MatchSimulationModal: React.FC<MatchSimulationModalProps> = ({
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white">
             <X className="w-5 h-5" />
           </button>
+        </div>
+
+        {/* Live Peru Clock Status */}
+        <div className="flex items-center justify-between px-3 py-1.5 rounded-xl bg-slate-900 border border-slate-800 text-[11px]">
+          <span className="text-slate-400 font-medium">🇵🇪 Horario Oficial Perú:</span>
+          <span className="font-mono font-bold text-amber-400 tabular-nums">{peruTime || '15:00:00'} (PET / UTC-5)</span>
         </div>
 
         {/* 2 Daily Matches Selector Tabs */}

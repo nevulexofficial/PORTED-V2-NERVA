@@ -141,6 +141,16 @@ export const api = {
       body: JSON.stringify({ auction_id, bid_amount }),
     });
   },
+  async generateAiBatch() {
+    return request<{ success: boolean; created: number; message: string }>('/api/market/generate-ai-batch', {
+      method: 'POST',
+    });
+  },
+  async levelUpClub() {
+    return request<{ success: boolean; club: Club; userCoins: number; message: string }>('/api/club/level-up', {
+      method: 'POST',
+    });
+  },
 
   // Leagues & Matches
   async getLeagues() {
@@ -263,6 +273,12 @@ export const api = {
       method: 'DELETE',
     });
   },
+  async updateAdminLeague(id: string, data: any) {
+    return request<{ success: boolean; league: League }>(`/api/admin/leagues/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data),
+    });
+  },
   // Admin Sponsors
   async getAdminSponsors() {
     return request<{ sponsors: any[] }>('/api/admin/sponsors');
@@ -270,6 +286,12 @@ export const api = {
   async createAdminSponsor(data: any) {
     return request<{ sponsor: any }>('/api/admin/sponsors', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateAdminSponsor(id: string, data: any) {
+    return request<{ success: boolean; sponsor: any }>(`/api/admin/sponsors/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },
@@ -282,6 +304,12 @@ export const api = {
   async createAdminTrophy(data: any) {
     return request<{ trophy: any }>('/api/admin/trophies', {
       method: 'POST',
+      body: JSON.stringify(data),
+    });
+  },
+  async updateAdminTrophy(id: string, data: any) {
+    return request<{ success: boolean; trophy: any }>(`/api/admin/trophies/${id}`, {
+      method: 'PUT',
       body: JSON.stringify(data),
     });
   },

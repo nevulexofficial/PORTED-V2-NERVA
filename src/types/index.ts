@@ -28,6 +28,9 @@ export interface Player {
   stats: PlayerStats;
   avatar_url: string;
   status: 'active' | 'listed' | 'auction' | 'injured';
+  injury_matches_remaining?: number;
+  injury_name?: string;
+  xp?: number;
   form: number;         // 1-10
   goals: number;
   assists: number;
@@ -59,6 +62,9 @@ export interface Club {
   // Reputation & Fans
   reputation: number; // Min 1200 needed for sponsors to view/offer
   fans: number;       // Follower count, max 8,000,000,000
+  // Level Progression System (Level 0 to 80 - Monumental requires Level 80)
+  level?: number;      // 0 default, up to 80
+  xp?: number;         // Accumulated experience points
   // Stadium (0 to 10 - Monumental)
   stadium_level: number;
   stadium_name: string;
@@ -137,7 +143,7 @@ export interface NotificationItem {
   club_id?: string;
   title: string;
   message: string;
-  type: 'sponsor_offer' | 'match_alert' | 'stadium' | 'social';
+  type: 'sponsor_offer' | 'match_alert' | 'stadium' | 'social' | 'level';
   data?: any;
   read: boolean;
   created_at: string;
@@ -355,4 +361,19 @@ export interface AppSettings {
   logo_url: string;
   maintenance_mode: boolean;
   registration_open: boolean;
+  background_url?: string;
+  background_opacity?: number;
+  background_style?: 'image' | 'dark' | 'gradient';
 }
+
+export interface LevelPrerequisites {
+  level: number;
+  title: string;
+  xp_required: number;
+  reputation_required: number;
+  matches_won_required: number;
+  fans_required: number;
+  is_monumental_eligible: boolean;
+  reward_coins: number;
+}
+

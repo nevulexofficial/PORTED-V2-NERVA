@@ -4,12 +4,12 @@ import { api } from '../../services/api.ts';
 import { Match, Auction, Standing } from '../../types/index.ts';
 import { 
   Trophy, Flame, ShoppingBag, ArrowRight, 
-  ChevronRight, Calendar, Sparkles, AlertCircle 
+  ChevronRight, Calendar, Sparkles, AlertCircle, Tv, Shield
 } from 'lucide-react';
 import { PWAInstallButton } from '../common/PWAInstallButton.tsx';
 
 interface HomeDashboardProps {
-  onNavigateTab: (tab: 'home' | 'club' | 'market' | 'leagues' | 'profile') => void;
+  onNavigateTab: (tab: any) => void;
   onOpenMatchModal: () => void;
 }
 
@@ -19,6 +19,19 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigateTab, onO
   const [featuredAuctions, setFeaturedAuctions] = useState<Auction[]>([]);
   const [myStanding, setMyStanding] = useState<Standing | null>(null);
   const [loading, setLoading] = useState(true);
+  const [peruTime, setPeruTime] = useState<string>('');
+
+  useEffect(() => {
+    const updatePeruClock = () => {
+      setPeruTime(new Date().toLocaleTimeString('es-PE', {
+        timeZone: 'America/Lima',
+        hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false
+      }));
+    };
+    updatePeruClock();
+    const interval = setInterval(updatePeruClock, 1000);
+    return () => clearInterval(interval);
+  }, []);
 
   useEffect(() => {
     async function loadDashboardData() {
@@ -139,9 +152,14 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigateTab, onO
               Próximo Partido Oficial
             </span>
           </div>
-          <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
-            Jornada {nextMatch?.matchday || 15}
-          </span>
+          <div className="flex items-center gap-1.5">
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-slate-800 text-amber-300 font-mono font-bold border border-slate-700">
+              🇵🇪 {peruTime || '15:00:00'} PET
+            </span>
+            <span className="text-[10px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 font-bold border border-emerald-500/20">
+              Jornada {nextMatch?.matchday || 15}
+            </span>
+          </div>
         </div>
 
         {nextMatch ? (
@@ -191,36 +209,58 @@ export const HomeDashboard: React.FC<HomeDashboardProps> = ({ onNavigateTab, onO
         )}
 
         <button
-          onClick={onOpenMatchModal}
-          className="w-full h-12 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-400 hover:to-teal-500 text-slate-950 font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-emerald-950/50 touch-press"
+          onClick={() => onNavigateTab('tv')}
+          className="w-full h-12 rounded-2xl bg-gradient-to-r from-rose-600 via-red-600 to-amber-600 hover:from-rose-500 hover:to-amber-500 text-white font-black text-xs uppercase tracking-wider flex items-center justify-center gap-2 shadow-lg shadow-rose-950/60 touch-press"
         >
-          <Flame className="w-4 h-4 fill-slate-950" />
-          <span>Partidos de Liga de Hoy (2 / Día)</span>
+          <Tv className="w-4 h-4 text-white animate-pulse" />
+          <span>Sintonizar Transmisión en Vivo (Horario Perú)</span>
         </button>
       </div>
 
-      {/* Quick Navigation Cards */}
+      {/* Quick Navigation Cards with Varied Colorful Section Icons */}
       <div className="grid grid-cols-2 gap-3">
         <button
-          onClick={() => onNavigateTab('market')}
-          className="flex flex-col p-4 rounded-2xl bg-[#121826] border border-slate-800 hover:border-slate-700 text-left transition touch-press"
+          onClick={() => onNavigateTab('tv')}
+          className="flex flex-col p-3.5 rounded-2xl bg-[#121826] border border-rose-500/20 hover:border-rose-500/40 text-left transition touch-press"
         >
-          <div className="w-9 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400 mb-2">
+          <div className="w-8 h-8 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-400 mb-2">
+            <Tv className="w-4 h-4 animate-pulse" />
+          </div>
+          <span className="text-xs font-bold text-white">Transmisión TV</span>
+          <span className="text-[10px] text-slate-400 mt-0.5">Partidos oficiales en vivo</span>
+        </button>
+
+        <button
+          onClick={() => onNavigateTab('market')}
+          className="flex flex-col p-3.5 rounded-2xl bg-[#121826] border border-emerald-500/20 hover:border-emerald-500/40 text-left transition touch-press"
+        >
+          <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center text-emerald-400 mb-2">
             <ShoppingBag className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-white">Mercado de Fichajes</span>
-          <span className="text-[10px] text-slate-400 mt-0.5">Refuerza tu plantilla titular</span>
+          <span className="text-xs font-bold text-white">Mercado & IA</span>
+          <span className="text-[10px] text-slate-400 mt-0.5">Fichajes y subastas 6m</span>
+        </button>
+
+        <button
+          onClick={() => onNavigateTab('club')}
+          className="flex flex-col p-3.5 rounded-2xl bg-[#121826] border border-amber-500/20 hover:border-amber-500/40 text-left transition touch-press"
+        >
+          <div className="w-8 h-8 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 mb-2">
+            <Shield className="w-4 h-4" />
+          </div>
+          <span className="text-xs font-bold text-white">Sede del Club</span>
+          <span className="text-[10px] text-slate-400 mt-0.5">Nivel 0-80 y Estadio</span>
         </button>
 
         <button
           onClick={() => onNavigateTab('leagues')}
-          className="flex flex-col p-4 rounded-2xl bg-[#121826] border border-slate-800 hover:border-slate-700 text-left transition touch-press"
+          className="flex flex-col p-3.5 rounded-2xl bg-[#121826] border border-purple-500/20 hover:border-purple-500/40 text-left transition touch-press"
         >
-          <div className="w-9 h-9 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400 mb-2">
+          <div className="w-8 h-8 rounded-xl bg-purple-500/15 border border-purple-500/30 flex items-center justify-center text-purple-400 mb-2">
             <Trophy className="w-4 h-4" />
           </div>
-          <span className="text-xs font-bold text-white">Tabla y Clasificación</span>
-          <span className="text-[10px] text-slate-400 mt-0.5">Sigue la lucha por el título</span>
+          <span className="text-xs font-bold text-white">Ligas & Estadísticas</span>
+          <span className="text-[10px] text-slate-400 mt-0.5">Pichichi y tabla oficial</span>
         </button>
       </div>
 

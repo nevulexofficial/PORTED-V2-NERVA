@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useAuth } from '../../context/AuthContext.tsx';
 import { api } from '../../services/api.ts';
 import { Shield, User, Camera, Upload, ArrowRight, Lock, Eye, EyeOff } from 'lucide-react';
+import { NervaCloudIcon } from '../common/NervaCloudIcon.tsx';
 
 interface NewUserPageProps {
   onSuccess?: () => void;
@@ -148,14 +149,10 @@ export const NewUserPage: React.FC<NewUserPageProps> = ({ onSuccess }) => {
       {/* Background athletic glow */}
       <div className="absolute top-10 left-1/2 -translate-x-1/2 w-72 h-72 bg-emerald-500/10 rounded-full blur-3xl pointer-events-none" />
 
-      {/* Brand Header */}
+      {/* Brand Header with Uploaded Pink Cloud Icon */}
       <div className="flex flex-col items-center text-center mb-6 relative z-10">
-        <div className="w-16 h-16 rounded-3xl bg-gradient-to-tr from-emerald-500 via-teal-400 to-amber-300 p-0.5 shadow-2xl shadow-emerald-500/20 mb-3 flex items-center justify-center">
-          <div className="w-full h-full bg-[#0a0e17] rounded-[22px] flex items-center justify-center">
-            <span className="font-sports text-3xl font-black text-transparent bg-clip-text bg-gradient-to-tr from-emerald-400 to-amber-300">
-              N
-            </span>
-          </div>
+        <div className="relative mb-2 flex items-center justify-center">
+          <NervaCloudIcon className="w-20 h-20" glow={true} />
         </div>
 
         <h1 className="font-sports text-3xl font-bold tracking-widest text-white">
